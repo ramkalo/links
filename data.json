@@ -56,6 +56,11 @@
           "url": "https://ramkalo.github.io/Obeyinator",
           "description": "MIDI Generator"
         }
+        {
+          "title": "arpulator",
+          "url": "https://ramkalo.github.io/arpulator",
+          "description": "Graphing calculator based midi arpeggiator"
+        }
       ]
     },
     {
