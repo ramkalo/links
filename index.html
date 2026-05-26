@@ -4,7 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Projects</title>
-  <link rel="stylesheet" href="styles.css">
+  <script>
+    (function() {
+      var v = Date.now();
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'styles.css?v=' + v;
+      document.head.appendChild(link);
+
+      var script = document.createElement('script');
+      script.src = 'script.js?v=' + v;
+      document.body.appendChild(script);
+    })();
+  </script>
 </head>
 <body>
   <header class="header">
@@ -19,6 +31,6 @@
     <p><a href="https://github.com/ramkalo/Linkinator" target="_blank" rel="noopener noreferrer">build your own site like this</a> - visit that link and read the "README" section</p>
   </footer>
 
-  <script src="script.js"></script>
+
 </body>
 </html>
