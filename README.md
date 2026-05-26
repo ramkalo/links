@@ -134,3 +134,38 @@ Whenever you want to change your links, here's the easiest way:
 6. Click **Commit changes**
 
 Your live site will update within about a minute.
+
+---
+
+## Going further
+
+Once your site is up and running, you might want to make it look different or add new features. Here's how to keep learning without getting overwhelmed.
+
+### Ask a Human
+Odds are there is someone in your life who can help teach you a bit about how to do this stuff. If you are in the Provo area then you can talk to me, Ram Kalo, at the musician town hall at 3Hive Record Lounge. You can also check to see what learning resources your local library, community center, or college has to offer. I've included some good online resources below.
+
+### Learn the fundamentals
+
+If you want to actually understand what you're doing — and eventually build more ambitious things — these are the best places to start:
+
+- [The Odin Project](https://www.theodinproject.com/) — a free, project-based curriculum that takes you from zero to building real websites. One of the best free resources out there, full stop.
+- [W3Schools](https://www.w3schools.com/) — straightforward explanations of HTML, CSS, and JavaScript with live examples you can edit in the browser. Great for looking things up.
+- [freeCodeCamp](https://www.freecodecamp.org/) — free interactive lessons with certificates. Good if you like structured learning with built-in exercises.
+
+### Use AI as a tutor
+
+There are bunch of stupid and evil people doing stupid and evil things with AI. Fuck those people and fuck govenor Cox. However, I believe that AI tools can be used for good, provided that you are using them to learn or assit you in certain ways and NOT using them to replace your humanity. AI tools like [Claude](https://claude.ai) or [ChatGPT](https://chatgpt.com) are awesome for learning to code. You can paste your code directly into a chat and ask questions like:
+
+- *"How do I change the background color in this CSS file?"*
+- *"Can you explain what this line of code does?"*
+- *"How would I add a profile photo to the top of this page?"*
+
+The key is to use it to **learn**, not just to get answers. Ask it to explain what it's doing and why. You'll pick things up faster than you'd expect.
+
+### Cheat sheets
+
+These are quick-reference pages you can keep open in another tab while you're editing. You don't need to memorize anything — just look things up as you go.
+
+- [HTML cheat sheet](https://htmlcheatsheet.com/) — the building blocks of every webpage
+- [CSS cheat sheet](https://htmlcheatsheet.com/css/) — colors, fonts, spacing, layout
+- [JavaScript cheat sheet](https://htmlcheatsheet.com/js/) — the language your `script.js` is written in
