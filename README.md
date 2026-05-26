@@ -8,7 +8,7 @@ No apps to install. No accounts required to get started. Just three files and a 
 
 ## What's in the folder
 
-To get started, download or copy this project. if you are reading this on the github page then scroll up and look for a green "< > Code", click on it and select "Download Zip". There are three main files:
+To get started, download, copy, or clone this project, also known as a repository. if you are reading this on the github page then scroll up and look for a green "Code" button, click on it and select "Download Zip". There are three main files:
 
 - **`index.html`** — This is the actual webpage. You don't need to touch it.
 - **`script.js`** — This is where all your content lives. Your name, your links, your categories — it's all in here. This is the only file you'll regularly edit.
