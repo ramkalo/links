@@ -1,24 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+/* Nord Dark color palette */
 :root {
-  --bg: #000000;
-  --card-bg: #141414;
-  --card-border: #2a2a2a;
-  --text: #ebebeb;
-  --text-muted: #bdbdbd;
-  --green: #39ff14;
-  --cyan: #00ffff;
-  --transition: 0.15s ease;
+  --bg:          #3B4252; /* nord1 — dark grey, used for cards/elements */
+  --card-bg:     #2E3440; /* nord0 — darkest, used for cards */
+  --card-border: #434C5E; /* nord2 — subtle borders */
+  --text:        #ECEFF4; /* nord6 — bright white-ish for main text */
+  --text-muted:  #D8DEE9; /* nord4 — softer for descriptions */
+  --green:       #7ECF4E; /* nord14 aurora green — boosted saturation */
+  --teal:        #4ECFCD; /* nord7 frost teal — boosted saturation */
+  --blue:        #45C8E0; /* nord8 frost blue — boosted saturation */
+  --blue-mid:    #4D9ED8; /* nord9 frost medium blue — boosted saturation */
+  --transition:  0.15s ease;
 }
 
 body {
   font-family: Consolas, Monaco, 'Ubuntu Mono', 'Courier New', monospace;
   font-size: 18px;
-  background: var(--bg);
+  background: linear-gradient(180deg, #3D4A5C, #3A4A42);
+  background-attachment: fixed;
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
@@ -32,14 +38,16 @@ body {
 }
 
 .header h1 {
-  font-size: 2.25rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 1.6rem;
+  line-height: 1.8;
+  font-weight: 400;
+  margin-bottom: 0.75rem;
   color: var(--green);
 }
 
 .description {
-  color: var(--text-muted);
+  color: var(--blue);
   font-size: 1.1rem;
 }
 
@@ -64,7 +72,7 @@ body {
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--card-border);
-  color: var(--cyan);
+  color: var(--teal);
 }
 
 .links {
@@ -89,7 +97,7 @@ body {
 .link-title {
   font-weight: 700;
   font-size: 1.2rem;
-  color: var(--text);
+  color: var(--blue-mid);
   margin-bottom: 0.25rem;
 }
 
@@ -111,9 +119,18 @@ body {
   margin-top: 2rem;
 }
 
+.footer a {
+  color: var(--blue-mid);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--green);
+}
+
 @media (min-width: 640px) {
   .header h1 {
-    font-size: 2.5rem;
+    font-size: 2rem;
   }
 
   .category {
