@@ -143,7 +143,9 @@ function render(data) {
 
   const footerEl = document.getElementById('page-footer');
   if (data.footer) {
-    footerEl.innerHTML = `<p>${escapeHtml(data.footer)}</p>`;
+    const p = document.createElement('p');
+    p.textContent = data.footer;
+    footerEl.prepend(p);
   }
 
   const container = document.getElementById('categories');
