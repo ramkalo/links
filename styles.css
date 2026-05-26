@@ -53,14 +53,14 @@ body {
 .profile-pic {
   width: 72px;
   height: 72px;
-  border-radius: 50%;
+  border-radius: 0%;
   object-fit: cover;
   border: 2px solid var(--green);
 }
 
 .header h1 {
   font-family: 'NeoGreekRunic', monospace;
-  font-size: 1.6rem;
+  font-size: 3rem;
   line-height: 1.8;
   font-weight: 400;
   color: var(--green);
@@ -149,10 +149,6 @@ body {
 }
 
 @media (min-width: 640px) {
-  .header h1 {
-    font-size: 2rem;
-  }
-
   .category {
     padding: 1.5rem;
   }
