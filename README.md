@@ -1,6 +1,6 @@
 # Linkinator
 
-A simple, free way to put all your links in one place — music, projects, social media, whatever. Looks good on phone and desktop.
+This project is a live webpage that I actually use AND it also serves as a template for other artists to use as their own landing page. It's a simple, free way to put all your links in one place — music, projects, social media, whatever. Looks good on phone and desktop.
 
 No apps to install. No accounts required to get started. Just three files and a browser.
 
