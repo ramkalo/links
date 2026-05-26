@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&display=swap');
 
 @font-face {
   font-family: 'NeoGreekRunic';
@@ -26,7 +26,7 @@
 }
 
 body {
-  font-family: Consolas, Monaco, 'Ubuntu Mono', 'Courier New', monospace;
+  font-family: 'JetBrains Mono', Monaco, 'Ubuntu Mono', 'Courier New', monospace;
   font-size: 18px;
   background: linear-gradient(180deg, #3D4A5C, #3A4A42);
   background-attachment: fixed;
@@ -44,7 +44,7 @@ body {
 
 .header-identity {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: center;
   gap: 1.25rem;
   margin-bottom: 0.75rem;

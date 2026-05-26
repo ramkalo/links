@@ -25,6 +25,11 @@ const data = {
           "title": "Spotify",
           "url": "https://www.spotify.com/us/signed-out/cancel/",
           "description": "Spotify is fully evil"
+        },
+        {
+          "title": "Instagram",
+          "url": "https://www.instagram.com/ramkalomusic/",
+          "description": "I post visual art that I make"
         }
       ]
     },
@@ -44,7 +49,7 @@ const data = {
         {
           "title": "BXTRXT",
           "url": "https://ramkalo.github.io/bxtrxt",
-          "description": "Photo Editor"
+          "description": "Free web based photo editor, works offline"
         },
         {
           "title": "Tunnelinator",
@@ -97,6 +102,11 @@ const data = {
           "description": "anti-capitalist QR code generator site made by Gabe"
         },
         {
+          "title": "Baby Becoming - Bentelou",
+          "url": "https://youtube.com/playlist?list=OLAK5uy_kItxjq2DjKw1cGHFlk3LPNl2NJYo0vyvU",
+          "description": "Fantastic album by a local artist"
+        },
+        {
           "title": "𝔱𝔥𝔢 𝔣𝔬𝔯𝔢𝔰𝔱 𝔬𝔣 𝔞𝔷𝔲𝔯𝔢",
           "url": "https://www.instagram.com/theforestofazure/",
           "description": "Instagram page with some art"
@@ -120,6 +130,11 @@ const data = {
           "title": "Recommended Listening",
           "url": "https://ramkalo.github.io/music-lists/",
           "description": "This page contains lists of musicians that are recommended by me or people I know"
+        },
+        {
+          "title": "Pope Leo Encyclical",
+          "url": "https://www.vatican.va/content/leo-xiv/en/encyclicals/documents/20260515-magnifica-humanitas.html",
+          "description": "pope spittin str8 fire on these hoes"
         }
       ]
     }
