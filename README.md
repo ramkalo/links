@@ -122,6 +122,11 @@ Share that link wherever you want.
 
 ---
 
+### Notes on publishing websites
+There are lots of free ways to publish a simple website. Once you've published on github and feel comfortable editing your site I suggest looking into other options that may work better for you. Some options include Cloudflare and Vercel. The biggest downside to sites that provide free website hosting is that you are often forced into using a certain domain name, like mymusicsucks.github.io/mymusicreallysucks. But keep in mind that if you want a custom domain, like mymusicsucks.gov, then you will need to give someone some money, there isn't a way around this. 
+
+---
+
 ## Updating your site after you've published
 
 Whenever you want to change your links, here's the easiest way:
