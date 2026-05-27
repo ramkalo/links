@@ -123,7 +123,7 @@ const data = {
         },
         {
           "title": "Exorcism",
-          "url": "https://www.usccb.org/prayer-and-worship/sacraments-and-sacramentals/sacramentals-blessings/sacramentals-blessings/exorcism",
+          "url": "https://www.usccb.org/prayer-and-worship/sacraments-and-sacramentals/sacramentals-blessings/exorcism",
           "description": "Big black shape with eyes of fire Tellin' people their desire Satan's sittin' there, he's smilin' Watches those flames get higher and higher Oh, no, no, please, God, help me"
         },
         {
