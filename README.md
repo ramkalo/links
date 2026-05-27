@@ -1,6 +1,6 @@
 # Linkinator
 
-A simple, free way to put all your links in one place — music, projects, social media, whatever. Looks good on phone and desktop.
+This project is a live webpage that I actually use AND it also serves as a template for other artists to use as their own landing page. It's a simple, free way to put all your links in one place — music, projects, social media, whatever. Looks good on phone and desktop.
 
 No apps to install. No accounts required to get started. Just three files and a browser.
 
@@ -8,7 +8,7 @@ No apps to install. No accounts required to get started. Just three files and a 
 
 ## What's in the folder
 
-To get started, download or copy this project. if you are reading this on the github page then scroll up and look for a green "< > Code", click on it and select "Download Zip". There are three main files:
+To get started, download, copy, or clone this project, also known as a repository. if you are reading this on the github page then scroll up and look for a green "Code" button, click on it and select "Download Zip". There are three main files:
 
 - **`index.html`** — This is the actual webpage. You don't need to touch it.
 - **`script.js`** — This is where all your content lives. Your name, your links, your categories — it's all in here. This is the only file you'll regularly edit.
