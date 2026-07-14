@@ -140,7 +140,7 @@ const data = {
           "title": "Pope Leo Encyclical",
           "url": "https://www.vatican.va/content/leo-xiv/en/encyclicals/documents/20260515-magnifica-humanitas.html",
           "description": "pope spittin str8 fire on these hoes"
-        }
+        },
         {
           "title": "neal.fun",
           "url": "https://neal.fun/",
