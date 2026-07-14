@@ -65,6 +65,11 @@ const data = {
           "title": "arpulator",
           "url": "https://ramkalo.github.io/arpulator",
           "description": "Graphing calculator based midi arpeggiator"
+        },
+        {
+          "title": "euphonator",
+          "url": "https://ramkalo.github.io/euphonator",
+          "description": "Music Theory Songwriting Tool"
         }
       ]
     },
@@ -135,6 +140,11 @@ const data = {
           "title": "Pope Leo Encyclical",
           "url": "https://www.vatican.va/content/leo-xiv/en/encyclicals/documents/20260515-magnifica-humanitas.html",
           "description": "pope spittin str8 fire on these hoes"
+        }
+        {
+          "title": "neal.fun",
+          "url": "https://neal.fun/",
+          "description": "games and stuff by Neal"
         }
       ]
     }
