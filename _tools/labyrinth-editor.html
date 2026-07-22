@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>labyrinth editor</title>
+
+<!-- The site's own stylesheet, so layout mode and the test button render blocks
+     with the real .lab-* rules instead of a lookalike that would drift. It goes
+     first on purpose: the editor's own rules below it win any tie, which is what
+     keeps the site's body/font rules from restyling the editor chrome. -->
+<link rel="stylesheet" href="../styles.css">
+
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -23,9 +30,11 @@
   body {
     font-family: 'JetBrains Mono', Monaco, 'Courier New', monospace;
     font-size: 13px;
+    line-height: 1.4;
     background: var(--card-bg);
     color: var(--text);
     height: 100vh;
+    min-height: 0;
     display: grid;
     grid-template-rows: auto 1fr;
     overflow: hidden;
@@ -148,7 +157,11 @@
   .cell-tags { margin-top: auto; font-size: 9px; color: var(--muted); opacity: .8; }
   .cell-start { color: var(--green); }
 
+  /* pinned explicitly: #canvas and #layout both claim cell 1/1, so leaving the
+     panel to auto-placement would let it slide into a row of its own */
   aside {
+    grid-column: 2;
+    grid-row: 1;
     border-left: 1px solid var(--border);
     background: var(--bg);
     overflow-y: auto;
@@ -240,6 +253,48 @@
   .link-card .count { margin-left: auto; font-size: 9px; color: var(--muted); }
   .link-card.unused .count { color: var(--red); }
 
+  /* the links tab — one editable row per link in the catalogue */
+
+  .link-row {
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    padding: 0.4rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .link-row.orphan { border-color: var(--red); }
+
+  .link-row-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  .link-row-head .count { margin-left: auto; }
+  .link-row.orphan .count { color: var(--red); }
+
+  .link-del {
+    padding: 0 0.3rem;
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--muted);
+  }
+
+  .link-del:hover { color: var(--red); border-color: var(--red); }
+
+  .link-row input {
+    display: block;
+    width: 100%;
+    margin-bottom: 0.2rem;
+  }
+
+  .link-row input[data-f="title"] { color: var(--blue); }
+  .link-row input[data-f="url"] { font-size: 10px; }
+  .link-row input[data-f="category"] { font-size: 10px; color: var(--muted); }
+
   .drag-ghost {
     position: fixed;
     z-index: 50;
@@ -267,6 +322,214 @@
 
   .hint { font-size: 10px; color: var(--muted); opacity: .7; line-height: 1.5; }
 
+  /* --- layout mode: the block-arrangement overlay ------------------------- */
+
+  /* Shares main's first grid cell with #canvas and paints over it, so the map is
+     hidden but the side panel stays available for the palette and settings.
+     Stacking this way rather than absolutely inside #canvas keeps it still while
+     the map behind it is scrolled. */
+  #layout {
+    grid-column: 1;
+    grid-row: 1;
+    z-index: 20;
+    min-width: 0;
+    min-height: 0;
+    background: var(--card-bg);
+    display: flex;
+    flex-direction: column;
+  }
+
+  #canvas { grid-column: 1; grid-row: 1; }
+
+  #layout[hidden] { display: none; }
+
+  .layout-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 11px;
+  }
+
+  .layout-bar .who { color: var(--green); margin-right: auto; }
+  .layout-bar .shape { display: flex; gap: 0.25rem; }
+  .layout-bar .shape button.on { border-color: var(--green); color: var(--green); }
+
+  .layout-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    overflow: auto;
+  }
+
+  /* The stage is the block, drawn with the site's own .lab-canvas grid so what
+     you arrange things on is literally the same 12x20 the visitor gets. */
+  #layout-stage {
+    position: relative;
+    overflow: hidden;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 12px 40px rgba(0,0,0,.45);
+    flex: none;
+  }
+
+  #layout-scaler { transform-origin: top left; }
+
+  /* neutralise the site's absolute positioning — here the page is a plain box at
+     whatever true size the chosen shape says */
+  #layout-page {
+    position: relative;
+    inset: auto;
+    transition: none;
+  }
+
+  /* Grid lines: a grid item spanning every track, so the lines land exactly on
+     the real cell boundaries inside the canvas's padding rather than being
+     guessed at from the outside. Pointer maths measures this element too. */
+  #layout-grid {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    pointer-events: none;
+    background-image:
+      repeating-linear-gradient(to right, rgba(255,255,255,.09) 0 1px, transparent 1px calc(100% / 12)),
+      repeating-linear-gradient(to bottom, rgba(255,255,255,.09) 0 1px, transparent 1px calc(100% / 20));
+    outline: 1px solid rgba(255,255,255,.12);
+  }
+
+  .lay-el {
+    outline: 1px dashed rgba(255,255,255,.22);
+    outline-offset: -1px;
+    cursor: grab;
+    position: relative;
+
+    /* beats .lab-el-para's overflow:auto — a scrolling box would carry the resize
+       handle out of reach, and text running past the edge shows the overflow just
+       as clearly while you're arranging */
+    overflow: hidden;
+  }
+
+  .lay-el:hover { outline-color: var(--teal); }
+  .lay-el.selected { outline: 1px solid var(--green); outline-offset: -1px; }
+  .lay-el.dragging { opacity: .5; }
+  .lay-el.bad { outline-color: var(--red); }
+
+  /* links and buttons inside must not swallow the drag, or grabbing an element
+     by its own text would follow the link instead of moving it */
+  .lay-el a, .lay-el button, .lay-el img { pointer-events: none; }
+
+  .lay-el .lay-tag {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    padding: 0 3px;
+    font-size: 9px;
+    line-height: 1.5;
+    color: var(--card-bg);
+    background: var(--teal);
+    opacity: 0;
+    white-space: nowrap;
+  }
+
+  .lay-el:hover .lay-tag, .lay-el.selected .lay-tag { opacity: 1; }
+  .lay-el.selected .lay-tag { background: var(--green); }
+
+  .lay-handle {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    width: 12px;
+    height: 12px;
+    background: var(--green);
+    border: 1px solid var(--card-bg);
+    cursor: nwse-resize;
+    opacity: 0;
+  }
+
+  .lay-el:hover .lay-handle, .lay-el.selected .lay-handle { opacity: 1; }
+
+  /* where a drag or resize would land — another grid item, so it snaps to the
+     same tracks the element itself will */
+  #layout-ghost {
+    z-index: 1;
+    background: rgba(126,207,78,.14);
+    border: 1px solid var(--green);
+    pointer-events: none;
+  }
+
+  #layout-ghost[hidden] { display: none; }
+
+  /* --- the palette and element inspector in the side panel ---------------- */
+
+  .palette { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; }
+  .palette button { text-align: left; font-size: 11px; }
+  .palette button:disabled { opacity: .35; cursor: not-allowed; border-color: var(--border); }
+  .palette .n { float: right; color: var(--muted); font-size: 9px; }
+
+  .el-list { margin-top: 0.5rem; }
+
+  .el-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    width: 100%;
+    padding: 0.25rem 0.35rem;
+    margin-bottom: 0.15rem;
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+
+  .el-row.on { border-color: var(--green); color: var(--text); }
+  .el-row .kind { color: var(--blue); }
+  .el-row .where { margin-left: auto; opacity: .6; }
+
+  .mark-bar { display: flex; gap: 0.25rem; margin-bottom: 0.25rem; }
+  .mark-bar button { padding: 0.15rem 0.45rem; font-size: 11px; line-height: 1.3; }
+  .mark-bar .spacer { margin-left: auto; }
+
+  #f-el-text { width: 100%; height: 5.5rem; resize: vertical; line-height: 1.4; }
+
+  .mark-preview {
+    margin-top: 0.3rem;
+    padding: 0.4rem 0.5rem;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--muted);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    max-height: 7rem;
+    overflow: auto;
+  }
+
+  .mark-preview p + p { margin-top: 0.5em; }
+  .mark-preview a { color: var(--blue); }
+  .mark-preview strong { color: var(--text); }
+
+  .seg { display: flex; gap: 0.2rem; }
+  .seg button { flex: 1; padding: 0.25rem 0; font-size: 10px; }
+  .seg button.on { border-color: var(--green); color: var(--green); }
+
+  .img-row { display: flex; gap: 0.3rem; align-items: flex-start; }
+  .img-row input { flex: 1; }
+
+  .img-thumb {
+    width: 3rem;
+    height: 3rem;
+    object-fit: contain;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+  }
+
+  .img-thumb.bad { border-color: var(--red); }
+
   dialog {
     background: var(--bg);
     color: var(--text);
@@ -292,9 +555,38 @@
 <main>
   <div id="canvas"><div id="grid"><svg id="wires"></svg></div></div>
 
+  <!-- Layout mode covers the map but not the side panel, which becomes the
+       palette and the selected element's settings while it's open. It's a
+       sibling of #canvas sharing the same grid cell rather than a child of it:
+       inside that scrolling container it would scroll away with the map. -->
+  <div id="layout" hidden>
+    <div class="layout-bar">
+      <span class="who" id="layout-who"></span>
+      <span class="hint">shape</span>
+      <span class="shape">
+        <button data-shape="phone">phone</button>
+        <button data-shape="desktop">desktop</button>
+      </span>
+      <button id="layout-done" class="primary">done</button>
+    </div>
+    <div class="layout-body">
+      <!-- stage is sized to the scaled-down result; scaler holds the block at
+           its true pixel size and shrinks it, so clamp()ed font sizes and the
+           capped canvas width land exactly where they will on a real screen -->
+      <div id="layout-stage">
+        <div id="layout-scaler">
+          <div class="lab-page lab-laid-out" id="layout-page">
+            <div class="lab-canvas" id="layout-canvas"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <aside>
     <div class="tabs">
       <button class="tab active" data-tab="block">block</button>
+      <button class="tab" data-tab="links">links</button>
       <button class="tab" data-tab="place">place</button>
       <button class="tab" data-tab="problems">problems<span class="tab-badge" id="problem-count" hidden></span></button>
     </div>
@@ -340,6 +632,11 @@
           <label>note (optional)</label>
           <input id="f-note" type="text" placeholder="cryptic aside">
         </div>
+
+        <div class="field" id="arrange-field">
+          <button id="arrange">arrange this block…</button>
+          <p class="hint" id="arrange-hint"></p>
+        </div>
         <div class="field">
           <label>exits — auto follows the grid, wall seals it, a block id is a wormhole</label>
           <div class="exits">
@@ -354,6 +651,123 @@
           <button id="delete-cell">delete</button>
         </div>
         <p class="hint">the delete key does the same thing.</p>
+      </div>
+    </section>
+
+    <!-- shown only while layout mode is open; it replaces the tabs entirely so
+         there is no way to edit the map behind the overlay by accident -->
+    <section id="layout-pane" hidden>
+      <h2>elements</h2>
+      <div class="palette" id="palette"></div>
+      <div class="el-list" id="el-list"></div>
+
+      <div id="el-editor" hidden>
+        <h2 style="margin-top:1rem">
+          <span id="el-kind"></span>
+          <button id="el-delete" style="float:right;font-size:10px;padding:0 0.3rem">delete</button>
+        </h2>
+
+        <div class="field" id="el-text-field">
+          <label id="el-text-label">text</label>
+          <div class="mark-bar" id="mark-bar">
+            <button data-wrap="**" title="bold"><strong>B</strong></button>
+            <button data-wrap="*" title="italic"><em>I</em></button>
+            <button data-link="1" title="link">link</button>
+          </div>
+          <textarea id="f-el-text" spellcheck="false"></textarea>
+          <div class="mark-preview" id="mark-preview" hidden></div>
+        </div>
+
+        <div class="field" id="el-img-field" hidden>
+          <label>image — a file in the site's images/ folder, or any https url</label>
+          <div class="img-row">
+            <input id="f-el-src" type="text" list="image-paths" placeholder="images/thing.jpg">
+            <img class="img-thumb" id="el-thumb" alt="">
+          </div>
+          <datalist id="image-paths"></datalist>
+          <p class="hint" id="img-hint"></p>
+          <label style="margin-top:0.4rem">fit</label>
+          <div class="seg" id="f-el-fit">
+            <button data-fit="contain">contain</button>
+            <button data-fit="cover">cover</button>
+            <button data-fit="fill">fill</button>
+          </div>
+          <label style="margin-top:0.4rem">alt text</label>
+          <input id="f-el-alt" type="text" placeholder="describes the image">
+        </div>
+
+        <div class="field" id="el-action-field" hidden>
+          <label>what the button does</label>
+          <select id="f-el-action">
+            <option value="url">open a link</option>
+            <option value="goto">go to a block</option>
+            <option value="random">jump somewhere at random</option>
+          </select>
+          <div id="el-to-url" style="margin-top:0.35rem">
+            <select id="f-el-tolink"></select>
+            <input id="f-el-to" type="text" placeholder="https://…" style="margin-top:0.25rem">
+          </div>
+          <select id="f-el-toblock" style="margin-top:0.35rem" hidden></select>
+        </div>
+
+        <div class="field" id="el-href-field">
+          <label>link (optional — makes the whole element clickable)</label>
+          <select id="f-el-hreflink"></select>
+          <input id="f-el-href" type="text" placeholder="https://…" style="margin-top:0.25rem">
+        </div>
+
+        <div class="field" id="el-size-field">
+          <label>size</label>
+          <div class="seg" id="f-el-size">
+            <button data-size="1">1</button>
+            <button data-size="2">2</button>
+            <button data-size="3">3</button>
+            <button data-size="4">4</button>
+            <button data-size="5">5</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>align</label>
+          <div class="seg" id="f-el-align">
+            <button data-align="left">left</button>
+            <button data-align="center">centre</button>
+            <button data-align="right">right</button>
+          </div>
+        </div>
+
+        <div class="field" id="el-valign-field">
+          <label>vertical</label>
+          <div class="seg" id="f-el-valign">
+            <button data-valign="top">top</button>
+            <button data-valign="middle">middle</button>
+            <button data-valign="bottom">bottom</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>position — drag on the stage, or type it</label>
+          <div class="exits">
+            <label>x <input id="f-el-x" type="number" min="0" max="11" step="1"></label>
+            <label>y <input id="f-el-y" type="number" min="0" max="19" step="1"></label>
+            <label>w <input id="f-el-w" type="number" min="1" max="12" step="1"></label>
+            <label>h <input id="f-el-h" type="number" min="1" max="20" step="1"></label>
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="el-front">bring to front</button>
+          <button id="el-back">send to back</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="links" hidden>
+      <p class="hint">every link the maze can hold. blocks point at these by url, so one link can sit on several blocks and editing it here fixes all of them. the place tab is where you put them on the grid.</p>
+      <div id="link-list"></div>
+      <datalist id="link-categories"></datalist>
+      <div class="row">
+        <button id="add-link">add link</button>
       </div>
     </section>
 
@@ -377,11 +791,14 @@
   <p class="hint" id="io-hint"></p>
 </dialog>
 
-<!-- labyrinth.js builds its overlay into this, which is what the test button drives -->
-<div id="labyrinth" class="labyrinth" hidden></div>
+<!-- labyrinth.js builds its overlay into this, which is what the test button
+     drives. data-preview tells it this is the editor, so it doesn't open the
+     live map over the top of us on load the way it does on the site. -->
+<div id="labyrinth" class="labyrinth" data-preview data-asset-base="../" hidden></div>
 
-<!-- script.js for the links, labyrinth.js for the movement rules and the codec -->
-<script src="../script.js"></script>
+<!-- map.js for the live map to start from, labyrinth.js for the movement rules
+     and the codec -->
+<script src="../map.js"></script>
 <script src="../labyrinth.js"></script>
 <script>
 (function () {
@@ -421,20 +838,26 @@
 
   /* ------------------------------------------------------------------ links */
 
+  /* The catalogue lives in the map now, so it travels with it — import a map and
+     you get its links too. A half-typed link with no url yet isn't placeable, so
+     it's hidden from everything except the links tab that's editing it. */
   function allLinks() {
-    var out = [];
-    (typeof data !== 'undefined' ? data.categories || [] : []).forEach(function (cat) {
-      (cat.links || []).forEach(function (link) {
-        out.push({ category: cat.name, title: link.title, url: link.url });
-      });
-    });
-    return out;
+    return (state.maze.links || []).filter(function (l) { return !!l.url; });
   }
 
   function linkTitle(url) {
     if (!url) return '';
     var hit = allLinks().filter(function (l) { return l.url === url; })[0];
-    return hit ? hit.title : url;
+    return hit ? (hit.title || hit.url) : url;
+  }
+
+  function groupByCategory(links) {
+    var groups = {};
+    links.forEach(function (l) {
+      var key = l.category || 'uncategorised';
+      (groups[key] = groups[key] || []).push(l);
+    });
+    return groups;
   }
 
   /* ------------------------------------------------------------------ state */
@@ -587,10 +1010,13 @@
       '<path d="M0,0 L10,5 L0,10 z" fill="#E5C07B"/></marker></defs>' + lines;
   }
 
+  /* Quotes too, not just angle brackets: most of what this escapes is going into
+     a value="" or data-url="" attribute, and a title with a " in it would
+     otherwise close the attribute early and mangle the row. */
   function esc(s) {
     var d = document.createElement('div');
     d.textContent = s == null ? '' : s;
-    return d.innerHTML;
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   /* ------------------------------------------------------------- validation */
@@ -608,12 +1034,16 @@
           if (t && !index.byId.get(t)) out.push(['bad', cell.id + ' → ' + dir + ' points at ' + t + ', which no longer exists']);
         });
       }
-      if (cell.link && !allLinks().some(function (l) { return l.url === cell.link; })) {
-        out.push(['warn', cell.id + ' uses a link that isn’t in script.js any more']);
-      }
+      L.cellUrls(cell).forEach(function (url) {
+        if (!allLinks().some(function (l) { return l.url === url; })) {
+          out.push(['warn', cell.id + ' points at a url that isn’t in the links tab: ' + url]);
+        }
+      });
       if (!L.isTunnel(cell) && !cell.link && !cell.title && !cell.note) {
         out.push(['warn', cell.id + ' is a blank block with nothing written on it']);
       }
+
+      L.layoutProblems(cell, index).forEach(function (p) { out.push(p); });
 
       if (L.isTunnel(cell)) {
         if (cell.link) out.push(['bad', cell.id + ' is a tunnel with a link on it — tunnels are passed through, never read']);
@@ -634,6 +1064,13 @@
       seen[key] = true;
     });
 
+    var urls = {};
+    (state.maze.links || []).forEach(function (l, i) {
+      if (!l.url) out.push(['warn', 'link ' + (i + 1) + (l.title ? ' (' + l.title + ')' : '') + ' has no url yet']);
+      else if (urls[l.url]) out.push(['warn', 'two links share the url ' + l.url + ' — blocks can’t tell them apart']);
+      else urls[l.url] = true;
+    });
+
     if (!state.maze.cells.length) out.push(['warn', 'no blocks yet']);
     else if (!index.byId.get(state.maze.start)) out.push(['bad', 'no start block set']);
     else if (L.isTunnel(index.byId.get(state.maze.start))) {
@@ -643,11 +1080,16 @@
     return out;
   }
 
-  /* how many pages currently use each link url */
+  /* How many blocks currently use each link url. Goes through L.cellUrls so a
+     link that only appears inside a paragraph or on a button still counts as
+     placed — otherwise the "unused" badge would start lying the moment anyone
+     arranged a block. */
   function placementCounts() {
     var counts = new Map();
     state.maze.cells.forEach(function (cell) {
-      if (cell.link) counts.set(cell.link, (counts.get(cell.link) || 0) + 1);
+      L.cellUrls(cell).forEach(function (url) {
+        counts.set(url, (counts.get(url) || 0) + 1);
+      });
     });
     return counts;
   }
@@ -664,8 +1106,7 @@
     badge.hidden = !issues.length;
 
     var counts = placementCounts();
-    var groups = {};
-    allLinks().forEach(function (l) { (groups[l.category] = groups[l.category] || []).push(l); });
+    var groups = groupByCategory(allLinks());
 
     var blankCard =
       '<button class="link-card blank" data-url="">' +
@@ -679,12 +1120,126 @@
       return '<p class="link-group">' + esc(cat) + '</p>' + groups[cat].map(function (l) {
         var n = counts.get(l.url) || 0;
         return '<button class="link-card ' + (n ? 'placed' : 'unused') + '" data-url="' + esc(l.url) + '">' +
-          '<span>' + esc(l.title) + '</span>' +
+          '<span>' + esc(l.title || l.url) + '</span>' +
           '<span class="count">' + (n === 0 ? 'unused' : n > 1 ? '×' + n : 'placed') + '</span>' +
           '</button>';
       }).join('');
     }).join('');
+
+    refreshLinkCounts();
   }
+
+  /* ------------------------------------------------------------- links tab */
+
+  /* Rebuilt only when a row is added or removed, never on a keystroke — redrawing
+     the list while someone is typing in one of its inputs would steal the caret.
+     Editing a field writes straight to the link and redraws the grid instead. */
+  function renderLinks() {
+    var links = state.maze.links || [];
+    var counts = placementCounts();
+
+    document.getElementById('link-categories').innerHTML =
+      Object.keys(groupByCategory(links)).map(function (cat) {
+        return '<option value="' + esc(cat) + '">';
+      }).join('');
+
+    if (!links.length) {
+      document.getElementById('link-list').innerHTML =
+        '<p class="hint">no links yet. add one, then drag it onto the grid from the place tab.</p>';
+      return;
+    }
+
+    document.getElementById('link-list').innerHTML = links.map(function (l, i) {
+      var n = l.url ? (counts.get(l.url) || 0) : 0;
+      var orphan = !l.url || !n;
+
+      return '<div class="link-row' + (orphan ? ' orphan' : '') + '" data-i="' + i + '">' +
+        '<div class="link-row-head">' +
+          '<span>' + (i + 1) + '</span>' +
+          '<span class="count">' + (!l.url ? 'no url' : n === 0 ? 'unused' : n > 1 ? 'on ' + n + ' blocks' : 'on 1 block') + '</span>' +
+          '<button class="link-del" data-del="' + i + '" title="delete this link">✕</button>' +
+        '</div>' +
+        '<input data-f="title" type="text" placeholder="title" value="' + esc(l.title) + '">' +
+        '<input data-f="url" type="text" placeholder="https://…" value="' + esc(l.url) + '">' +
+        '<input data-f="description" type="text" placeholder="description" value="' + esc(l.description) + '">' +
+        '<input data-f="category" type="text" placeholder="category" list="link-categories" value="' + esc(l.category) + '">' +
+        '</div>';
+    }).join('');
+  }
+
+  /* Rewrites just the "on 2 blocks" tallies, leaving the inputs untouched, so the
+     list can stay honest while the grid changes underneath it. */
+  function refreshLinkCounts() {
+    var links = state.maze.links || [];
+    var counts = placementCounts();
+
+    Array.prototype.forEach.call(document.querySelectorAll('#link-list .link-row'), function (row) {
+      var l = links[Number(row.dataset.i)];
+      if (!l) return;
+
+      var n = l.url ? (counts.get(l.url) || 0) : 0;
+      row.classList.toggle('orphan', !l.url || !n);
+      row.querySelector('.count').textContent =
+        !l.url ? 'no url' : n === 0 ? 'unused' : n > 1 ? 'on ' + n + ' blocks' : 'on 1 block';
+    });
+  }
+
+  document.getElementById('link-list').addEventListener('input', function (e) {
+    var field = e.target.dataset.f;
+    if (!field) return;
+
+    var link = (state.maze.links || [])[Number(e.target.closest('.link-row').dataset.i)];
+    if (!link) return;
+
+    /* Blocks hold the url, not an index into the list, so changing it here has to
+       drag them along or every block using this link would go dead. Firing on
+       every keystroke is fine: each one repoints from the previous value. */
+    if (field === 'url') {
+      var was = link.url;
+      var now = e.target.value.trim();
+      if (was) {
+        state.maze.cells.forEach(function (c) { if (c.link === was) c.link = now; });
+      }
+      link.url = now;
+    } else {
+      link[field] = e.target.value;
+    }
+
+    draw();
+  });
+
+  document.getElementById('link-list').addEventListener('click', function (e) {
+    var del = e.target.closest('.link-del');
+    if (!del) return;
+
+    var i = Number(del.dataset.del);
+    var link = (state.maze.links || [])[i];
+    if (!link) return;
+
+    var used = state.maze.cells.filter(function (c) { return c.link && c.link === link.url; }).length;
+    if (used && !confirm(used + ' block(s) still point at this link. delete it anyway? they’ll show up under problems.')) {
+      return;
+    }
+
+    state.maze.links.splice(i, 1);
+    renderLinks();
+    draw();
+  });
+
+  document.getElementById('add-link').addEventListener('click', function () {
+    var links = state.maze.links || (state.maze.links = []);
+
+    /* most of the time you're adding several to the same category in a row */
+    var last = links[links.length - 1];
+    links.push({ url: '', title: '', description: '', category: last ? last.category || '' : '' });
+
+    renderLinks();
+    draw();
+
+    var rows = document.querySelectorAll('#link-list .link-row');
+    var fresh = rows[rows.length - 1];
+    if (fresh) fresh.querySelector('[data-f="title"]').focus();
+  });
 
   function showTab(name) {
     state.tab = name;
@@ -704,16 +1259,13 @@
   /* -------------------------------------------------------------- inspector */
 
   function fillLinkSelect(select, current) {
-    var groups = {};
-    allLinks().forEach(function (l) {
-      (groups[l.category] = groups[l.category] || []).push(l);
-    });
+    var groups = groupByCategory(allLinks());
 
     select.innerHTML =
       '<option value=""' + (current ? '' : ' selected') + '>— none, text only —</option>' +
       Object.keys(groups).map(function (cat) {
         return '<optgroup label="' + esc(cat) + '">' + groups[cat].map(function (l) {
-          return '<option value="' + esc(l.url) + '"' + (l.url === current ? ' selected' : '') + '>' + esc(l.title) + '</option>';
+          return '<option value="' + esc(l.url) + '"' + (l.url === current ? ' selected' : '') + '>' + esc(l.title || l.url) + '</option>';
         }).join('') + '</optgroup>';
       }).join('');
 
@@ -835,6 +1387,17 @@
     document.getElementById('f-title').value = cell.title || '';
     document.getElementById('f-note').value = cell.note || '';
     DIRS.forEach(function (dir) { fillExitSelect(document.getElementById('f-' + dir), dir, cell); });
+
+    /* Nothing to arrange on a tunnel — you pass through one without reading it. */
+    document.getElementById('arrange-field').hidden = tunnel;
+    if (!tunnel) {
+      var n = (cell.layout || []).length;
+      document.getElementById('arrange').textContent =
+        n ? 'arrange this block… (' + n + ' element' + (n === 1 ? '' : 's') + ')' : 'arrange this block…';
+      document.getElementById('arrange-hint').textContent = n
+        ? 'the fields above are ignored while a block has an arrangement of its own.'
+        : 'lay title, text, images and a button out on a grid. the ✎ on the block does this too.';
+    }
   }
 
   function currentCell() {
@@ -937,9 +1500,10 @@
   document.getElementById('delete-selected').addEventListener('click', deleteSelected);
 
   document.addEventListener('keydown', function (e) {
-    /* while a test is running the keyboard belongs to the labyrinth, not the
-       editor — otherwise escape and delete would edit the map behind it */
-    if (io.open || testing) return;
+    /* while a test is running the keyboard belongs to the labyrinth, and while
+       layout mode is open it belongs to that — otherwise escape and delete would
+       edit the map behind whatever is covering it */
+    if (io.open || testing || !layOverlay.hidden) return;
 
     /* backspacing inside the title field must not delete the page */
     var focused = document.activeElement;
@@ -1212,19 +1776,21 @@
       showTab('block');
       showInspector();
       draw();
+      openLayout(edit.dataset.edit);
       return;
     }
 
     var slot = e.target.closest('.slot');
     if (!slot || justDragged) return;
 
+    /* reach for a link nobody has placed yet; with no links at all this just
+       makes a text-only block, which is a perfectly good thing to want */
     var links = allLinks();
-    if (!links.length) { alert('no links found in script.js'); return; }
-
     var placed = new Set(state.maze.cells.map(function (c) { return c.link; }));
     var pick = links.filter(function (l) { return !placed.has(l.url); })[0] || links[0];
 
-    var cell = { id: nextId(), x: Number(slot.dataset.x), y: Number(slot.dataset.y), link: pick.url };
+    var cell = { id: nextId(), x: Number(slot.dataset.x), y: Number(slot.dataset.y) };
+    if (pick) cell.link = pick.url;
     state.maze.cells.push(cell);
     if (!state.maze.start || state.maze.cells.length === 1) state.maze.start = cell.id;
 
@@ -1238,6 +1804,725 @@
     draw();
   });
 
+  /* =========================================================== layout mode ==
+
+     Arranging one block's contents on the 12x20 grid. The stage renders the
+     block at true pixel size and scales the whole thing down, so clamp()ed font
+     sizes and the capped canvas width land exactly where they will on a real
+     screen rather than where a shrunken copy would put them. */
+
+  var SHAPES = {
+    phone: { w: 390, h: 844, label: 'phone' },
+    desktop: { w: 1280, h: 800, label: 'desktop' }
+  };
+
+  var lay = { id: null, sel: -1, shape: 'phone' };
+
+  var layPanel = document.getElementById('layout-pane');
+  var layOverlay = document.getElementById('layout');
+  var layStage = document.getElementById('layout-stage');
+  var layScaler = document.getElementById('layout-scaler');
+  var layPage = document.getElementById('layout-page');
+  var layCanvas = document.getElementById('layout-canvas');
+
+  function layCell() {
+    return L.indexMaze(state.maze).byId.get(lay.id);
+  }
+
+  function layList() {
+    var cell = layCell();
+    return (cell && cell.layout) || [];
+  }
+
+  function laySelected() {
+    return layList()[lay.sel] || null;
+  }
+
+  /* A block that has never been arranged starts from what it already says, so
+     you're editing something rather than facing an empty grid. */
+  function seedLayout(cell) {
+    var link = allLinks().filter(function (l) { return l.url === cell.link; })[0] || {};
+    var out = [];
+    var y = 5;
+
+    out.push({
+      type: 'title', x: 1, y: y, w: 10, h: 4,
+      text: cell.title || link.title || cell.link || 'untitled',
+      href: cell.link || ''
+    });
+    y += 5;
+
+    var desc = cell.description || link.description || '';
+    if (desc) { out.push({ type: 'para', x: 1, y: y, w: 10, h: 4, text: desc }); y += 5; }
+    if (cell.note) out.push({ type: 'line', x: 1, y: Math.min(y, 18), w: 10, h: 2, text: cell.note, size: 1 });
+
+    return out;
+  }
+
+  function openLayout(id) {
+    var cell = L.indexMaze(state.maze).byId.get(id);
+    if (!cell) return;
+
+    /* You pass through a tunnel in under a second and never get to read it —
+       arranging one would be effort spent on something nobody sees. */
+    if (L.isTunnel(cell)) {
+      alert('tunnels are passed through, not read — there is nothing to arrange on one.');
+      return;
+    }
+
+    if (!cell.layout || !cell.layout.length) cell.layout = seedLayout(cell);
+
+    lay.id = id;
+    lay.sel = cell.layout.length ? 0 : -1;
+
+    layOverlay.hidden = false;
+    document.querySelector('.tabs').hidden = true;
+    Array.prototype.forEach.call(document.querySelectorAll('.pane'), function (p) { p.hidden = true; });
+    layPanel.hidden = false;
+
+    document.getElementById('layout-who').textContent =
+      'arranging ' + id + (cell.link ? ' — ' + linkTitle(cell.link) : '');
+
+    drawLayout();
+  }
+
+  function closeLayout() {
+    if (layOverlay.hidden) return;
+
+    /* An arrangement with nothing on it is just noise in the map file, and the
+       block renders better through the old centred path without it. */
+    var cell = layCell();
+    if (cell && cell.layout && !cell.layout.length) delete cell.layout;
+
+    lay.id = null;
+    lay.sel = -1;
+
+    layOverlay.hidden = true;
+    layPanel.hidden = true;
+    document.querySelector('.tabs').hidden = false;
+    showTab(state.tab);
+    showInspector();
+    draw();
+  }
+
+  document.getElementById('layout-done').addEventListener('click', closeLayout);
+
+  document.querySelector('.layout-bar .shape').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-shape]');
+    if (!b) return;
+    lay.shape = b.dataset.shape;
+    drawLayout();
+  });
+
+  document.getElementById('arrange').addEventListener('click', function () {
+    if (primaryId()) openLayout(primaryId());
+  });
+
+  /* ---------------------------------------------------------- drawing */
+
+  function drawLayout() {
+    if (layOverlay.hidden) return;
+
+    var shape = SHAPES[lay.shape];
+    var body = document.querySelector('.layout-body');
+
+    /* fit the true-size block into whatever room the overlay has, never up */
+    var room = body.getBoundingClientRect();
+    var scale = Math.min(
+      (room.width - 40) / shape.w,
+      (room.height - 40) / shape.h,
+      1
+    );
+    scale = Math.max(0.15, scale);
+
+    layPage.style.width = shape.w + 'px';
+    layPage.style.height = shape.h + 'px';
+    layScaler.style.transform = 'scale(' + scale + ')';
+    layStage.style.width = Math.round(shape.w * scale) + 'px';
+    layStage.style.height = Math.round(shape.h * scale) + 'px';
+
+    Array.prototype.forEach.call(document.querySelectorAll('.layout-bar [data-shape]'), function (b) {
+      b.classList.toggle('on', b.dataset.shape === lay.shape);
+    });
+
+    var list = layList();
+
+    layCanvas.innerHTML =
+      '<div id="layout-grid"></div>' +
+      list.map(function (el) { return L.buildElement(el, '../'); }).join('') +
+      '<div id="layout-ghost" hidden></div>';
+
+    /* buildElement emits them in order, so the nth .lab-el is the nth element —
+       decorate rather than re-templating, and the stage stays the real thing */
+    var nodes = layCanvas.querySelectorAll('.lab-el');
+    Array.prototype.forEach.call(nodes, function (node, i) {
+      node.classList.add('lay-el');
+      node.dataset.i = i;
+      if (i === lay.sel) node.classList.add('selected');
+      if (!inBounds(list[i])) node.classList.add('bad');
+
+      node.insertAdjacentHTML('afterbegin',
+        '<span class="lay-tag">' + esc(list[i].type) + '</span>' +
+        '<span class="lay-handle" data-resize="' + i + '"></span>');
+    });
+
+    renderPalette();
+    renderElList();
+    showElEditor();
+    save();
+  }
+
+  function inBounds(el) {
+    return el.x >= 0 && el.y >= 0 && el.w >= 1 && el.h >= 1 &&
+      el.x + el.w <= L.GRID.cols && el.y + el.h <= L.GRID.rows;
+  }
+
+  function typeCounts() {
+    var counts = {};
+    L.EL_TYPES.forEach(function (t) { counts[t] = 0; });
+    layList().forEach(function (el) { counts[el.type] = (counts[el.type] || 0) + 1; });
+    return counts;
+  }
+
+  function renderPalette() {
+    var counts = typeCounts();
+
+    document.getElementById('palette').innerHTML = L.EL_TYPES.map(function (t) {
+      var n = counts[t];
+      var cap = L.EL_LIMITS[t];
+      return '<button data-add="' + t + '"' + (n >= cap ? ' disabled' : '') + '>' +
+        t + '<span class="n">' + n + '/' + cap + '</span></button>';
+    }).join('');
+  }
+
+  function renderElList() {
+    document.getElementById('el-list').innerHTML = layList().map(function (el, i) {
+      var what = el.type === 'image' ? (el.src || 'no image')
+        : el.type === 'button' ? (el.text || 'button')
+        : (el.text || '(empty)');
+
+      return '<div class="el-row' + (i === lay.sel ? ' on' : '') + '" data-pick="' + i + '">' +
+        '<span class="kind">' + esc(el.type) + '</span>' +
+        '<span>' + esc(String(what).slice(0, 22)) + '</span>' +
+        '<span class="where">' + el.x + ',' + el.y + ' ' + el.w + '×' + el.h + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  /* --------------------------------------------------- add / pick / remove */
+
+  /* Somewhere free-ish to drop a new element, so two in a row don't land on top
+     of each other. Walks down the grid looking for a band nothing else uses. */
+  function freeSpot(w, h) {
+    var used = layList();
+
+    for (var y = 0; y + h <= L.GRID.rows; y++) {
+      var clash = used.some(function (el) {
+        return !(el.y + el.h <= y || el.y >= y + h);
+      });
+      if (!clash) return { x: Math.floor((L.GRID.cols - w) / 2), y: y };
+    }
+    return { x: Math.floor((L.GRID.cols - w) / 2), y: 0 };
+  }
+
+  var NEW_ELEMENT = {
+    title: { w: 10, h: 4, text: 'title' },
+    line: { w: 10, h: 2, text: 'a line of text', size: 2 },
+    para: { w: 10, h: 6, text: 'Some words. **Bold** works, so does *italic*, and [a link](https://example.com).', size: 3, valign: 'top' },
+    image: { w: 6, h: 6, src: '' },
+    button: { w: 4, h: 2, text: 'press this', action: 'url', to: '' }
+  };
+
+  document.getElementById('palette').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-add]');
+    if (!b || b.disabled) return;
+
+    var type = b.dataset.add;
+    if (typeCounts()[type] >= L.EL_LIMITS[type]) return;
+
+    var seed = NEW_ELEMENT[type];
+    var spot = freeSpot(seed.w, seed.h);
+    var el = { type: type, x: spot.x, y: spot.y, w: seed.w, h: seed.h };
+
+    Object.keys(seed).forEach(function (k) {
+      if (k !== 'w' && k !== 'h') el[k] = seed[k];
+    });
+
+    var cell = layCell();
+    cell.layout = cell.layout || [];
+    cell.layout.push(el);
+    lay.sel = cell.layout.length - 1;
+
+    drawLayout();
+  });
+
+  document.getElementById('el-list').addEventListener('click', function (e) {
+    var row = e.target.closest('[data-pick]');
+    if (!row) return;
+    lay.sel = Number(row.dataset.pick);
+    drawLayout();
+  });
+
+  function deleteElement() {
+    if (lay.sel < 0) return;
+
+    var cell = layCell();
+    cell.layout.splice(lay.sel, 1);
+    lay.sel = Math.min(lay.sel, cell.layout.length - 1);
+    drawLayout();
+  }
+
+  document.getElementById('el-delete').addEventListener('click', deleteElement);
+
+  /* array order is paint order, so reordering is the whole of z-order */
+  function reorder(toEnd) {
+    if (lay.sel < 0) return;
+
+    var list = layCell().layout;
+    var el = list.splice(lay.sel, 1)[0];
+
+    if (toEnd) { list.push(el); lay.sel = list.length - 1; }
+    else { list.unshift(el); lay.sel = 0; }
+
+    drawLayout();
+  }
+
+  document.getElementById('el-front').addEventListener('click', function () { reorder(true); });
+  document.getElementById('el-back').addEventListener('click', function () { reorder(false); });
+
+  /* ------------------------------------------------- dragging and resizing */
+
+  var layDrag = null;
+
+  /* The grid overlay spans every track, so its rect is exactly the area the
+     cells occupy — already scaled, and already inside the canvas padding. That
+     makes it the one honest thing to measure pointer positions against. */
+  function cellSize() {
+    var rect = document.getElementById('layout-grid').getBoundingClientRect();
+    return {
+      rect: rect,
+      w: rect.width / L.GRID.cols,
+      h: rect.height / L.GRID.rows
+    };
+  }
+
+  layCanvas.addEventListener('pointerdown', function (e) {
+    if (e.button !== 0) return;
+
+    var node = e.target.closest('.lay-el');
+    if (!node) return;
+
+    var i = Number(node.dataset.i);
+    var el = layList()[i];
+    if (!el) return;
+
+    var metric = cellSize();
+    layDrag = {
+      i: i,
+      resize: !!e.target.closest('.lay-handle'),
+      x: e.clientX,
+      y: e.clientY,
+      startX: el.x, startY: el.y, startW: el.w, startH: el.h,
+      cw: metric.w, ch: metric.h,
+      moved: false,
+      picked: lay.sel !== i
+    };
+
+    /* Select by swapping classes rather than redrawing: a full redraw here would
+       replace the node this pointer is captured on and the drag would die on the
+       spot. Capture goes on the canvas for the same reason. */
+    if (layDrag.picked) {
+      lay.sel = i;
+      Array.prototype.forEach.call(layCanvas.querySelectorAll('.lay-el'), function (n) {
+        n.classList.toggle('selected', n === node);
+      });
+      renderElList();
+      showElEditor();
+    }
+
+    layCanvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  document.addEventListener('pointermove', function (e) {
+    if (!layDrag) return;
+
+    var dx = e.clientX - layDrag.x;
+    var dy = e.clientY - layDrag.y;
+
+    if (!layDrag.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+    layDrag.moved = true;
+
+    var stepX = Math.round(dx / layDrag.cw);
+    var stepY = Math.round(dy / layDrag.ch);
+
+    var next = layDrag.resize
+      ? {
+          x: layDrag.startX, y: layDrag.startY,
+          w: clamp(layDrag.startW + stepX, 1, L.GRID.cols - layDrag.startX),
+          h: clamp(layDrag.startH + stepY, 1, L.GRID.rows - layDrag.startY)
+        }
+      : {
+          x: clamp(layDrag.startX + stepX, 0, L.GRID.cols - layDrag.startW),
+          y: clamp(layDrag.startY + stepY, 0, L.GRID.rows - layDrag.startH),
+          w: layDrag.startW, h: layDrag.startH
+        };
+
+    showLayGhost(next);
+  });
+
+  document.addEventListener('pointerup', function () {
+    if (!layDrag) return;
+
+    var d = layDrag;
+    layDrag = null;
+
+    var ghost = document.getElementById('layout-ghost');
+    if (!d.moved || !ghost || ghost.hidden) {
+      hideLayGhost();
+      if (d.picked) drawLayout(); /* a plain click still needs the full refresh */
+      return;
+    }
+
+    var el = layList()[d.i];
+    if (el) {
+      el.x = Number(ghost.dataset.gx);
+      el.y = Number(ghost.dataset.gy);
+      el.w = Number(ghost.dataset.gw);
+      el.h = Number(ghost.dataset.gh);
+    }
+    drawLayout();
+  });
+
+  function clamp(n, lo, hi) {
+    return Math.max(lo, Math.min(hi, n));
+  }
+
+  function showLayGhost(box) {
+    var ghost = document.getElementById('layout-ghost');
+    if (!ghost) return;
+
+    ghost.hidden = false;
+    ghost.style.gridColumn = (box.x + 1) + '/span ' + box.w;
+    ghost.style.gridRow = (box.y + 1) + '/span ' + box.h;
+    ghost.dataset.gx = box.x;
+    ghost.dataset.gy = box.y;
+    ghost.dataset.gw = box.w;
+    ghost.dataset.gh = box.h;
+  }
+
+  function hideLayGhost() {
+    var ghost = document.getElementById('layout-ghost');
+    if (ghost) ghost.hidden = true;
+  }
+
+  /* ------------------------------------------------------- element settings */
+
+  function showElEditor() {
+    var el = laySelected();
+    document.getElementById('el-editor').hidden = !el;
+    if (!el) return;
+
+    var isText = el.type === 'title' || el.type === 'line' || el.type === 'para';
+    var isPara = el.type === 'para';
+
+    document.getElementById('el-kind').textContent = el.type;
+    document.getElementById('el-text-field').hidden = el.type === 'image';
+    document.getElementById('el-img-field').hidden = el.type !== 'image';
+    document.getElementById('el-action-field').hidden = el.type !== 'button';
+    document.getElementById('el-href-field').hidden = el.type === 'button' || el.type === 'para';
+    document.getElementById('el-size-field').hidden = el.type === 'image' || el.type === 'button';
+
+    /* a paragraph is always top-aligned: a centred box that overflows can't be
+       scrolled back to its first line, so the control would be a lie */
+    document.getElementById('el-valign-field').hidden = isPara;
+
+    document.getElementById('el-text-label').textContent =
+      isPara ? 'text — **bold**, *italic*, [link](url), blank line for a new paragraph'
+        : el.type === 'button' ? 'label' : 'text';
+    document.getElementById('mark-bar').hidden = !isPara;
+
+    document.getElementById('f-el-text').value = el.text || '';
+    updatePreview();
+
+    if (el.type === 'image') {
+      document.getElementById('f-el-src').value = el.src || '';
+      document.getElementById('f-el-alt').value = el.alt || '';
+      fillImagePaths();
+      updateThumb();
+      segment('f-el-fit', 'fit', el.fit || L.EL_DEFAULTS.fit);
+    }
+
+    if (el.type === 'button') {
+      document.getElementById('f-el-action').value = el.action || 'url';
+      document.getElementById('f-el-to').value = el.action === 'goto' ? '' : (el.to || '');
+      fillLinkSelect(document.getElementById('f-el-tolink'), el.action === 'url' ? el.to : '');
+      fillBlockSelect(document.getElementById('f-el-toblock'), el.action === 'goto' ? el.to : '');
+      showButtonTarget(el.action || 'url');
+    }
+
+    if (!document.getElementById('el-href-field').hidden) {
+      document.getElementById('f-el-href').value = el.href || '';
+      fillLinkSelect(document.getElementById('f-el-hreflink'), el.href || '');
+    }
+
+    segment('f-el-size', 'size', String(el.size === undefined ? L.EL_DEFAULTS.size : el.size));
+    segment('f-el-align', 'align', el.align || L.EL_DEFAULTS.align);
+    segment('f-el-valign', 'valign', el.valign || L.EL_DEFAULTS.valign);
+
+    ['x', 'y', 'w', 'h'].forEach(function (k) {
+      document.getElementById('f-el-' + k).value = el[k];
+    });
+  }
+
+  function segment(id, key, value) {
+    Array.prototype.forEach.call(document.querySelectorAll('#' + id + ' [data-' + key + ']'), function (b) {
+      b.classList.toggle('on', b.dataset[key] === value);
+    });
+  }
+
+  function showButtonTarget(action) {
+    document.getElementById('el-to-url').hidden = action !== 'url';
+    document.getElementById('f-el-toblock').hidden = action !== 'goto';
+  }
+
+  function fillBlockSelect(select, current) {
+    select.innerHTML = '<option value="">— pick a block —</option>' +
+      state.maze.cells.filter(function (c) { return !L.isTunnel(c); }).map(function (c) {
+        return '<option value="' + esc(c.id) + '"' + (c.id === current ? ' selected' : '') + '>' +
+          esc(c.id + ' · ' + (c.title || linkTitle(c.link) || 'text only')) + '</option>';
+      }).join('');
+  }
+
+  /* Every image already used anywhere in the map, so the second block that wants
+     the same picture doesn't have to have the path typed out again. */
+  function fillImagePaths() {
+    var seen = {};
+    state.maze.cells.forEach(function (c) {
+      (c.layout || []).forEach(function (el) {
+        if (el.type === 'image' && el.src) seen[el.src] = true;
+      });
+    });
+
+    document.getElementById('image-paths').innerHTML = Object.keys(seen).map(function (src) {
+      return '<option value="' + esc(src) + '">';
+    }).join('');
+  }
+
+  /* The editor sits in _tools/, one folder deeper than the images do, so a
+     preview has to climb out before a site-relative path resolves. */
+  function updateThumb() {
+    var el = laySelected();
+    var thumb = document.getElementById('el-thumb');
+    var hint = document.getElementById('img-hint');
+    var src = (el && el.src) || '';
+
+    if (!src) {
+      thumb.removeAttribute('src');
+      thumb.classList.remove('bad');
+      hint.textContent = 'drop the file into the site’s images/ folder yourself — the editor can’t write to your repo.';
+      return;
+    }
+
+    thumb.src = /^https?:/i.test(src) ? src : '../' + src;
+    thumb.onload = function () { thumb.classList.remove('bad'); hint.textContent = 'found it.'; };
+    thumb.onerror = function () {
+      thumb.classList.add('bad');
+      hint.textContent = 'nothing at that path yet — check the file is in images/ and spelled the same.';
+    };
+  }
+
+  function updatePreview() {
+    var el = laySelected();
+    var box = document.getElementById('mark-preview');
+    box.hidden = !el || el.type !== 'para';
+    if (box.hidden) return;
+
+    box.innerHTML = L.renderMarkup(el.text || '');
+  }
+
+  /* ------------------------------------------------------- committing edits */
+
+  function elCommit(patch) {
+    var el = laySelected();
+    if (!el) return;
+
+    Object.keys(patch).forEach(function (k) {
+      if (patch[k] === '' || patch[k] === undefined || patch[k] === null) delete el[k];
+      else el[k] = patch[k];
+    });
+
+    drawLayout();
+  }
+
+  /* Redraws the stage without rebuilding the side panel, so typing into a field
+     doesn't yank the caret out of it mid-keystroke. */
+  function elLiveCommit(patch) {
+    var el = laySelected();
+    if (!el) return;
+
+    Object.keys(patch).forEach(function (k) {
+      if (patch[k] === '' || patch[k] === undefined || patch[k] === null) delete el[k];
+      else el[k] = patch[k];
+    });
+
+    var node = layCanvas.querySelector('.lay-el[data-i="' + lay.sel + '"]');
+    if (node) {
+      var fresh = document.createElement('div');
+      fresh.innerHTML = L.buildElement(el, '../');
+      node.innerHTML =
+        '<span class="lay-tag">' + esc(el.type) + '</span>' +
+        '<span class="lay-handle" data-resize="' + lay.sel + '"></span>' +
+        fresh.firstChild.innerHTML;
+    }
+
+    renderElList();
+    save();
+  }
+
+  document.getElementById('f-el-text').addEventListener('input', function (e) {
+    elLiveCommit({ text: e.target.value });
+    updatePreview();
+  });
+
+  document.getElementById('f-el-src').addEventListener('input', function (e) {
+    elLiveCommit({ src: e.target.value.trim() });
+    updateThumb();
+  });
+
+  document.getElementById('f-el-alt').addEventListener('input', function (e) {
+    elLiveCommit({ alt: e.target.value });
+  });
+
+  document.getElementById('f-el-href').addEventListener('input', function (e) {
+    elLiveCommit({ href: e.target.value.trim() });
+  });
+
+  document.getElementById('f-el-hreflink').addEventListener('change', function (e) {
+    document.getElementById('f-el-href').value = e.target.value;
+    elLiveCommit({ href: e.target.value });
+  });
+
+  document.getElementById('f-el-to').addEventListener('input', function (e) {
+    elLiveCommit({ to: e.target.value.trim() });
+  });
+
+  document.getElementById('f-el-tolink').addEventListener('change', function (e) {
+    document.getElementById('f-el-to').value = e.target.value;
+    elLiveCommit({ to: e.target.value });
+  });
+
+  document.getElementById('f-el-toblock').addEventListener('change', function (e) {
+    elLiveCommit({ to: e.target.value });
+  });
+
+  document.getElementById('f-el-action').addEventListener('change', function (e) {
+    /* the target means something different per action, so it never carries over */
+    elCommit({ action: e.target.value, to: '' });
+  });
+
+  ['x', 'y', 'w', 'h'].forEach(function (k) {
+    document.getElementById('f-el-' + k).addEventListener('input', function (e) {
+      var el = laySelected();
+      if (!el) return;
+
+      var max = (k === 'x' || k === 'w') ? L.GRID.cols : L.GRID.rows;
+      var lo = (k === 'w' || k === 'h') ? 1 : 0;
+      var patch = {};
+      patch[k] = clamp(Math.round(Number(e.target.value) || 0), lo, max);
+      elLiveCommitBox(patch);
+    });
+  });
+
+  /* Position typed in by hand still has to stay on the grid as a whole box. */
+  function elLiveCommitBox(patch) {
+    var el = laySelected();
+    if (!el) return;
+
+    Object.keys(patch).forEach(function (k) { el[k] = patch[k]; });
+
+    el.w = clamp(el.w, 1, L.GRID.cols);
+    el.h = clamp(el.h, 1, L.GRID.rows);
+    el.x = clamp(el.x, 0, L.GRID.cols - el.w);
+    el.y = clamp(el.y, 0, L.GRID.rows - el.h);
+
+    drawLayout();
+  }
+
+  layPanel.addEventListener('click', function (e) {
+    var seg = e.target.closest('[data-size], [data-align], [data-valign], [data-fit]');
+    if (!seg || !seg.closest('.seg')) return;
+
+    if (seg.dataset.size) elCommit({ size: Number(seg.dataset.size) });
+    else if (seg.dataset.align) elCommit({ align: seg.dataset.align });
+    else if (seg.dataset.valign) elCommit({ valign: seg.dataset.valign });
+    else if (seg.dataset.fit) elCommit({ fit: seg.dataset.fit });
+  });
+
+  /* ---------------------------------------------------- the markdown toolbar */
+
+  document.getElementById('mark-bar').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+
+    var box = document.getElementById('f-el-text');
+    var from = box.selectionStart;
+    var to = box.selectionEnd;
+    var picked = box.value.slice(from, to);
+
+    var before, after;
+    if (b.dataset.link) {
+      before = '[';
+      after = '](https://)';
+      picked = picked || 'text';
+    } else {
+      before = after = b.dataset.wrap;
+      picked = picked || (b.dataset.wrap === '**' ? 'bold' : 'italic');
+    }
+
+    box.value = box.value.slice(0, from) + before + picked + after + box.value.slice(to);
+    box.focus();
+    box.setSelectionRange(from + before.length, from + before.length + picked.length);
+
+    elLiveCommit({ text: box.value });
+    updatePreview();
+  });
+
+  /* --------------------------------------------------------------- keyboard */
+
+  document.addEventListener('keydown', function (e) {
+    if (layOverlay.hidden || io.open) return;
+
+    var focused = document.activeElement;
+    var typing = focused && /^(INPUT|SELECT|TEXTAREA)$/.test(focused.tagName);
+
+    if (e.key === 'Escape') {
+      if (typing) { focused.blur(); return; }
+      closeLayout();
+      return;
+    }
+
+    if (typing) return;
+
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      deleteElement();
+      return;
+    }
+
+    /* nudge the selection a cell at a time */
+    var step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!step || lay.sel < 0) return;
+
+    e.preventDefault();
+    elLiveCommitBox({
+      x: laySelected().x + step[0],
+      y: laySelected().y + step[1]
+    });
+  }, true);
+
+  window.addEventListener('resize', function () { drawLayout(); });
+
   /* ------------------------------------------------------------ import/export */
 
   var io = document.getElementById('io');
@@ -1250,12 +2535,28 @@
   function q(s) { return "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'"; }
 
   /* The decoy has to look like a real map at a glance: same squares, same shape,
-     links rotated and exits shuffled. */
+     links rotated and exits shuffled. The catalogue rides along unchanged — the
+     urls aren't the secret, where they sit is. */
+  /* Plausible filler for the decoy's laid-out blocks — the shape of the thing
+     without any of the content. */
+  var decoyText = [
+    'the door is not where you left it',
+    'keep going',
+    'nothing here',
+    'you have been this way before',
+    'turn back',
+    'a room with no corners',
+    'listen',
+    'the walls are warm'
+  ];
+  var decoySrc = ['images/wall.jpg', 'images/door.png', 'images/floor.jpg', 'images/dark.png'];
+
   function decoyOf(maze) {
     /* text-only pages have no link to rotate, so draw the decoy's links from the
        ones that do exist — otherwise the decoy serialises a literal "undefined" */
     var urls = maze.cells.map(function (c) { return c.link; }).filter(Boolean);
     if (!urls.length) urls = allLinks().map(function (l) { return l.url; });
+    if (!urls.length) urls = [''];
 
     var cells = maze.cells.map(function (c, i) {
       var cell = { id: c.id, x: c.x, y: c.y };
@@ -1272,6 +2573,24 @@
       } else if (urls.length) {
         cell.link = urls[(i * 7 + 3) % urls.length];
       }
+
+      /* A laid-out block keeps its shape — boxes in the same places, same element
+         types — and lies about every word, picture and destination in it. The
+         geometry has to survive or the decoy stops looking like a real map. */
+      if (c.layout && c.layout.length) {
+        cell.layout = c.layout.map(function (el, j) {
+          var fake = {};
+          Object.keys(el).forEach(function (k) { fake[k] = el[k]; });
+
+          if (fake.text) fake.text = decoyText[(i * 5 + j * 3) % decoyText.length];
+          if (fake.src) fake.src = decoySrc[(i + j) % decoySrc.length];
+          if (fake.href) fake.href = urls[(i * 3 + j + 1) % urls.length];
+          if (fake.action === 'url' && fake.to) fake.to = urls[(i + j * 2) % urls.length];
+          if (fake.action === 'goto' && fake.to) fake.to = maze.cells[(i * 13 + j) % maze.cells.length].id;
+
+          return fake;
+        });
+      }
       return cell;
     });
     var real = maze.cells.filter(function (c) { return c.exits; }).length || 3;
@@ -1281,59 +2600,92 @@
       at.exits = {};
       at.exits[dir] = n % 3 === 1 ? null : cells[(n * 11 + 2) % cells.length].id;
     }
-    return { start: cells.length ? cells[Math.floor(cells.length / 2)].id : 'c0', cells: cells };
+    return {
+      start: cells.length ? cells[Math.floor(cells.length / 2)].id : 'c0',
+      links: maze.links || [],
+      cells: cells
+    };
   }
 
+  function linkJs(l) {
+    var parts = ['url: ' + q(l.url), 'title: ' + q(l.title || '')];
+    if (l.description) parts.push('description: ' + q(l.description));
+    if (l.category) parts.push('category: ' + q(l.category));
+    return '      { ' + parts.join(', ') + ' }';
+  }
+
+  /* Anything sitting at its default is left out entirely — with five settings on
+     every element and a map full of them, writing them all would bloat both the
+     readable half of map.js and the blob under it for no gain. */
+  var EL_ORDER = ['type', 'x', 'y', 'w', 'h', 'text', 'src', 'alt', 'fit',
+                  'href', 'action', 'to', 'size', 'align', 'valign'];
+
+  function elJs(el) {
+    var parts = [];
+
+    EL_ORDER.forEach(function (k) {
+      var v = el[k];
+      if (v === undefined || v === null || v === '') return;
+      if (L.EL_DEFAULTS[k] !== undefined && v === L.EL_DEFAULTS[k]) return;
+
+      parts.push(k + ': ' + (typeof v === 'number' ? v : q(v)));
+    });
+
+    return '{ ' + parts.join(', ') + ' }';
+  }
+
+  function cellJs(c) {
+    var parts = ['id: ' + q(c.id), 'x: ' + c.x, 'y: ' + c.y];
+    if (c.link) parts.push('link: ' + q(c.link));
+    if (c.tunnel) {
+      parts.push('tunnel: { color: ' + q(c.tunnel.color) + ', ms: ' + c.tunnel.ms +
+        ', fx: ' + c.tunnel.fx + ', effect: ' + q(c.tunnel.effect) +
+        ', back: ' + c.tunnel.back + ' }');
+    }
+    if (c.exits) {
+      parts.push('exits: { ' + Object.keys(c.exits).map(function (k) {
+        return k + ': ' + (c.exits[k] === null ? 'null' : q(c.exits[k]));
+      }).join(', ') + ' }');
+    }
+
+    /* one element per line — a laid-out block on a single line is unreadable */
+    if (c.layout && c.layout.length) {
+      return '      { ' + parts.join(', ') + ', layout: [\n' +
+        c.layout.map(function (el) { return '        ' + elJs(el); }).join(',\n') +
+        '\n      ] }';
+    }
+
+    return '      { ' + parts.join(', ') + ' }';
+  }
+
+  /* A whole map.js, not a fragment — you replace the file, so there is nothing to
+     line up against and no way to clip the engine by pasting badly. */
   function mapCode() {
     var decoy = decoyOf(state.maze);
+    var blob = L.encodeMaze(state.maze).match(/.{1,84}/g).map(q).join(' +\n  ');
 
-    var decoyJs = '  var labyrinth = {\n    start: ' + q(decoy.start) + ',\n    cells: [\n' +
-      decoy.cells.map(function (c) {
-        var parts = ['id: ' + q(c.id), 'x: ' + c.x, 'y: ' + c.y];
-        if (c.link) parts.push('link: ' + q(c.link));
-        if (c.tunnel) {
-          parts.push('tunnel: { color: ' + q(c.tunnel.color) + ', ms: ' + c.tunnel.ms +
-            ', fx: ' + c.tunnel.fx + ', effect: ' + q(c.tunnel.effect) +
-            ', back: ' + c.tunnel.back + ' }');
-        }
-        if (c.exits) {
-          parts.push('exits: { ' + Object.keys(c.exits).map(function (k) {
-            return k + ': ' + (c.exits[k] === null ? 'null' : q(c.exits[k]));
-          }).join(', ') + ' }');
-        }
-        return '      { ' + parts.join(', ') + ' }';
-      }).join(',\n') + '\n    ]\n  };';
-
-    var blob = L.encodeMaze(state.maze).match(/.{1,84}/g).map(q).join(' +\n    ');
-
-    return decoyJs +
-      '\n\n  /* Prebuilt cache of the map above. Falls back to it if anything goes wrong. */\n' +
-      '  var LABYRINTH_CACHE =\n    ' + blob + ';';
+    return '/* The labyrinth\'s contents: every link, every block, and where they sit.\n' +
+      '\n' +
+      '   Generated by _tools/labyrinth-editor.html. Never hand-edit this file — open the\n' +
+      '   editor, change it there, and paste the whole file back over this one.\n' +
+      '\n' +
+      '   LABYRINTH_MAP below is a decoy: same shape, same squares, wrong contents. The\n' +
+      '   real map is the LABYRINTH_CACHE blob under it. */\n' +
+      '\n' +
+      'var LABYRINTH_MAP = {\n' +
+      '  start: ' + q(decoy.start) + ',\n' +
+      '  links: [\n' + decoy.links.map(linkJs).join(',\n') + '\n  ],\n' +
+      '  cells: [\n' + decoy.cells.map(cellJs).join(',\n') + '\n  ]\n' +
+      '};\n' +
+      '\n' +
+      'var LABYRINTH_CACHE =\n  ' + blob + ';\n';
   }
 
   /* ------------------------------------------------------------------ test */
 
-  /* The site's stylesheet is only pulled in while a test is running. It defines
-     body and .link-card rules of its own, which would fight the editor's — but
-     the overlay covers the whole window, so nothing underneath is visible, and
-     the link goes away again on exit. */
-  var siteStyles = null;
+  /* The site's stylesheet is loaded in <head> now, ahead of the editor's own, so
+     a test run has nothing to fetch and nothing to wait for. */
   var testing = false;
-
-  function withSiteStyles(then) {
-    if (siteStyles) { then(); return; }
-
-    siteStyles = document.createElement('link');
-    siteStyles.rel = 'stylesheet';
-    siteStyles.href = '../styles.css';
-
-    var go = function () { then(); };
-    siteStyles.addEventListener('load', go);
-    siteStyles.addEventListener('error', go); /* unstyled is better than nothing */
-    setTimeout(go, 1200);                     /* and never hang on it */
-
-    document.head.appendChild(siteStyles);
-  }
 
   function startTest() {
     if (testing) return;
@@ -1347,17 +2699,10 @@
     var from = selected && !L.isTunnel(selected) ? selected.id : state.maze.start;
     if (!index.byId.get(from)) { alert('set a start block first'); return; }
 
-    var called = false;
-    withSiteStyles(function () {
-      if (called) return;
-      called = true;
-
-      testing = true;
-      L.preview(state.maze, from, function () {
-        testing = false;
-        if (siteStyles) { siteStyles.remove(); siteStyles = null; }
-        draw();
-      });
+    testing = true;
+    L.preview(state.maze, from, function () {
+      testing = false;
+      draw();
     });
   }
 
@@ -1367,7 +2712,7 @@
     var text = mapCode();
     ioText.value = text;
     ioApply.hidden = true;
-    ioHint.textContent = 'paste this into labyrinth.js, replacing everything between the two "generated map" comments.';
+    ioHint.textContent = 'save this over map.js in the project root — the whole file, links and all.';
     io.showModal();
     ioText.select();
     try { navigator.clipboard.writeText(text); } catch (err) { /* user can copy by hand */ }
@@ -1376,7 +2721,7 @@
   document.getElementById('import').addEventListener('click', function () {
     ioText.value = '';
     ioApply.hidden = false;
-    ioHint.textContent = 'paste generated map code (or raw JSON) here.';
+    ioHint.textContent = 'paste a map.js (or raw JSON) here.';
     io.showModal();
   });
 
@@ -1393,26 +2738,32 @@
 
     if (!maze || !maze.cells) { ioHint.textContent = "couldn't read a map out of that."; return; }
 
-    state.maze = maze;
-    state.selection = [];
-    showInspector();
-    draw();
+    useMaze(maze);
     io.close();
   });
 
   document.getElementById('load-live').addEventListener('click', function () {
-    if (!confirm('replace the draft with the map currently in labyrinth.js?')) return;
-    state.maze = L.loadMaze();
-    state.selection = [];
-    showInspector();
-    draw();
+    if (!confirm('replace the draft with the map currently in map.js?')) return;
+    useMaze(L.loadMaze());
   });
 
   /* ------------------------------------------------------------------ start */
 
-  state.maze = load() || L.loadMaze();
-  showInspector();
-  draw();
+  /* Maps written before the links moved into them have no catalogue at all — an
+     old saved draft, or one exported by an older editor. Borrow the live one so
+     their blocks still resolve to something, rather than opening on a map where
+     every block points at a url the editor claims not to know about. */
+  function useMaze(maze) {
+    if (!maze.links) maze.links = (L.loadMaze().links || []).slice();
+
+    state.maze = maze;
+    state.selection = [];
+    showInspector();
+    renderLinks();
+    draw();
+  }
+
+  useMaze(load() || L.loadMaze());
 })();
 </script>
 </body>

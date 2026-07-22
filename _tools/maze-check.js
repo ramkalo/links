@@ -12,13 +12,18 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 
 /* Both files are browser scripts, so run them as function bodies and hand back
-   the bindings we care about rather than trying to parse them. */
-function evaluate(file, expression) {
+   the bindings we care about rather than trying to parse them. `globals` is how
+   map.js's two variables get in front of labyrinth.js — on a real page they'd be
+   window properties, but each file here runs in its own function scope. */
+function evaluate(file, expression, globals) {
   const src = fs.readFileSync(path.join(root, file), 'utf8');
+  const names = Object.keys(globals || {});
   const shim = { exports: {} };
-  return new Function('document', 'window', 'module', src + '\n;return (' + expression + ');')(
-    stubDocument(), undefined, shim
-  );
+
+  return new Function(
+    'document', 'window', 'module', ...names,
+    src + '\n;return (' + expression + ');'
+  )(stubDocument(), undefined, shim, ...names.map(n => globals[n]));
 }
 
 function stubDocument() {
@@ -30,8 +35,8 @@ function stubDocument() {
   };
 }
 
-const data = evaluate('script.js', 'data');
-const L = evaluate('labyrinth.js', 'module.exports');
+const map = evaluate('map.js', '({ LABYRINTH_MAP: LABYRINTH_MAP, LABYRINTH_CACHE: LABYRINTH_CACHE })');
+const L = evaluate('labyrinth.js', 'module.exports', map);
 
 const maze = L.loadMaze();
 const index = L.indexMaze(maze);
@@ -41,7 +46,7 @@ const problems = [];
 const notes = [];
 
 const linkUrls = new Set();
-(data.categories || []).forEach(cat => (cat.links || []).forEach(link => linkUrls.add(link.url)));
+(maze.links || []).forEach(link => { if (link.url) linkUrls.add(link.url); });
 
 const seen = new Map();
 maze.cells.forEach(cell => {
@@ -60,6 +65,16 @@ maze.cells.forEach(cell => {
     });
   }
 
+  /* Same rules the editor's problems tab shows, from the same function, so the
+     two can't disagree about whether a block is sound. */
+  L.layoutProblems(cell, index).forEach(([severity, text]) => {
+    (severity === 'bad' ? problems : notes).push(text);
+  });
+
+  L.cellUrls(cell).forEach(url => {
+    if (!linkUrls.has(url)) notes.push(`${cell.id} points at a url that isn't in the link list: ${url}`);
+  });
+
   if (L.isTunnel(cell)) {
     if (cell.link) problems.push(`${cell.id} is a tunnel with a link on it`);
 
@@ -68,10 +83,8 @@ maze.cells.forEach(cell => {
     if (!L.tunnelRoute(index, cell, null, () => 0.5).dest) {
       problems.push(`${cell.id} is a tunnel that never reaches a chamber — it would trap whoever walks in`);
     }
-  } else if (!cell.link) {
+  } else if (!cell.link && !L.hasLayout(cell)) {
     if (!cell.title && !cell.note) notes.push(`${cell.id} is a blank block with nothing written on it`);
-  } else if (!linkUrls.has(cell.link)) {
-    notes.push(`${cell.id} uses a link that isn't in script.js: ${cell.link}`);
   }
 });
 
@@ -81,15 +94,20 @@ if (L.isTunnel(index.byId.get(maze.start) || {})) {
 
 if (!index.byId.get(maze.start)) problems.push(`start "${maze.start}" isn't a real block`);
 
-const placed = new Set(maze.cells.filter(c => c.link).map(c => c.link));
+/* A link counts as placed wherever it turns up — on the block, on one of its
+   elements, on a button, or inline in a paragraph. */
+const placed = new Set();
+maze.cells.forEach(c => L.cellUrls(c).forEach(url => placed.add(url)));
 [...linkUrls].filter(url => !placed.has(url)).forEach(url => notes.push(`not in the maze: ${url}`));
 
 const wormholes = maze.cells.filter(c => c.exits && Object.values(c.exits).some(v => v)).length;
 const walls = maze.cells.filter(c => c.exits && Object.values(c.exits).some(v => v === null)).length;
 const tunnels = maze.cells.filter(c => L.isTunnel(c)).length;
-const blanks = maze.cells.filter(c => !c.link && !L.isTunnel(c)).length;
+const blanks = maze.cells.filter(c => !c.link && !L.isTunnel(c) && !L.hasLayout(c)).length;
+const laidOut = maze.cells.filter(c => L.hasLayout(c)).length;
 
-console.log(`${maze.cells.length} blocks, ${live.size} reachable, ${tunnels} tunnels, ${wormholes} wormholes, ${walls} walls, ${blanks} text-only`);
+console.log(`${maze.cells.length} blocks, ${live.size} reachable, ${tunnels} tunnels, ${wormholes} wormholes, ${walls} walls, ${blanks} text-only, ${laidOut} arranged`);
+console.log(`${linkUrls.size} links, ${[...linkUrls].filter(u => placed.has(u)).length} of them placed`);
 notes.forEach(n => console.log('  note: ' + n));
 problems.forEach(p => console.log('  PROBLEM: ' + p));
 

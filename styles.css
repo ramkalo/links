@@ -25,6 +25,8 @@
   --transition:  0.15s ease;
 }
 
+/* The labyrinth is the whole page, so the body never scrolls — every block is
+   one full screen and moving between them is a transform, not a scroll. */
 body {
   font-family: 'JetBrains Mono', Monaco, 'Ubuntu Mono', 'Courier New', monospace;
   font-size: 18px;
@@ -33,141 +35,6 @@ body {
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 2rem;
-  padding: 2rem 1rem;
-  border-bottom: 1px solid var(--card-border);
-}
-
-.header-identity {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 1.25rem;
-  margin-bottom: 0.75rem;
-}
-
-.profile-pic {
-  width: 72px;
-  height: 72px;
-  border-radius: 0%;
-  object-fit: cover;
-  border: 2px solid var(--green);
-}
-
-.header h1 {
-  font-family: 'NeoGreekRunic', monospace;
-  font-size: 3rem;
-  line-height: 1.8;
-  font-weight: 400;
-  color: var(--green);
-}
-
-.description {
-  color: var(--blue);
-  font-size: 1.1rem;
-}
-
-.categories {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 1rem;
-}
-
-.category {
-  background: var(--card-bg);
-  padding: 1.25rem;
-  border: 1px solid var(--card-border);
-}
-
-.category-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--card-border);
-  color: var(--teal);
-}
-
-.links {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.link-card {
-  display: block;
-  text-decoration: none;
-  background: var(--bg);
-  padding: 0.875rem 1rem;
-  border: 1px solid var(--card-border);
-  transition: border-color var(--transition);
-}
-
-.link-card:hover {
-  border-color: var(--green);
-}
-
-.link-title {
-  font-weight: 700;
-  font-size: 1.2rem;
-  color: var(--blue-mid);
-  margin-bottom: 0.25rem;
-}
-
-.link-description {
-  font-size: 1rem;
-  color: var(--text-muted);
-}
-
-.link-url {
-  display: none;
-}
-
-.footer {
-  text-align: center;
-  padding: 2rem 0;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  border-top: 1px solid var(--card-border);
-  margin-top: 2rem;
-}
-
-.footer a {
-  color: var(--blue-mid);
-  text-decoration: none;
-}
-
-.footer a:hover {
-  color: var(--green);
-}
-
-/* ---------------------------------------------------------- labyrinth mode */
-
-.labyrinth-toggle {
-  margin-top: 1.25rem;
-  font-family: inherit;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  background: none;
-  border: 1px solid var(--card-border);
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  transition: color var(--transition), border-color var(--transition);
-}
-
-.labyrinth-toggle:hover {
-  color: var(--green);
-  border-color: var(--green);
-}
-
-body.labyrinth-active {
   overflow: hidden;
 }
 
@@ -206,6 +73,160 @@ body.labyrinth-active {
   max-width: 34rem;
   text-align: center;
 }
+
+/* --- laid-out blocks: elements arranged on a 12x20 grid ------------------- */
+
+/* The canvas takes the full height and up to CANVAS_MAX of width, centred, with
+   the block's background running past it to the screen edges. That keeps "one
+   block = one full screen" while narrowing the shape you're designing against
+   from roughly 4:1 (phone vs desktop) down to 2:1, which is actually
+   authorable. The padding reserves the ring the edge arrows live in. */
+.lab-page.lab-laid-out {
+  padding: 0;
+  display: block;
+}
+
+.lab-canvas {
+  width: min(100%, 900px);
+  height: 100%;
+  margin-inline: auto;
+  padding: 3rem 1.75rem;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: repeat(20, 1fr);
+
+  /* cq units below resolve against this, so text scales with the canvas rather
+     than with whatever shape its own grid cell happens to be */
+  container-type: size;
+}
+
+.lab-el {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lab-el[data-align='left']   { justify-content: flex-start; text-align: left; }
+.lab-el[data-align='center'] { justify-content: center;     text-align: center; }
+.lab-el[data-align='right']  { justify-content: flex-end;   text-align: right; }
+
+.lab-el[data-valign='top']    { align-items: flex-start; }
+.lab-el[data-valign='middle'] { align-items: center; }
+.lab-el[data-valign='bottom'] { align-items: flex-end; }
+
+.lab-el > * { min-width: 0; max-width: 100%; }
+
+.lab-el-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Five steps, each a clamp so a phone never gets microscopic text and a desktop
+   never gets a headline that eats the screen. cqw tracks the canvas width, which
+   is capped, so the top of each range is reached and held. */
+.lab-el-title { color: var(--green); font-family: 'NeoGreekRunic', monospace; line-height: 1.25; }
+.lab-el-title[data-size='1'] { font-size: clamp(1.1rem, 5cqw, 1.9rem); }
+.lab-el-title[data-size='2'] { font-size: clamp(1.4rem, 7cqw, 2.6rem); }
+.lab-el-title[data-size='3'] { font-size: clamp(1.8rem, 9cqw, 3.4rem); }
+.lab-el-title[data-size='4'] { font-size: clamp(2.2rem, 12cqw, 4.4rem); }
+.lab-el-title[data-size='5'] { font-size: clamp(2.6rem, 15cqw, 5.6rem); }
+
+a.lab-el-link:hover .lab-el-text { color: var(--teal); }
+
+.lab-el-line { color: var(--text-muted); line-height: 1.4; }
+.lab-el-line[data-size='1'] { font-size: clamp(0.7rem, 2.4cqw, 0.9rem); }
+.lab-el-line[data-size='2'] { font-size: clamp(0.8rem, 3cqw, 1.05rem); }
+.lab-el-line[data-size='3'] { font-size: clamp(0.9rem, 3.6cqw, 1.25rem); }
+.lab-el-line[data-size='4'] { font-size: clamp(1.05rem, 4.6cqw, 1.6rem); }
+.lab-el-line[data-size='5'] { font-size: clamp(1.2rem, 5.6cqw, 2rem); }
+
+/* A paragraph that outgrows its box scrolls inside it rather than being clipped.
+   pan-y lets a touch drag scroll it; labyrinth.js leaves gestures that start in
+   an overflowing one alone so reading to the bottom doesn't change block.
+
+   Block rather than flex, so it is always top-aligned: a centred flex child that
+   overflows its container can't be scrolled back to its own first line, which is
+   a genuinely unfixable trap. The editor hides the vertical-align control for
+   paragraphs to match. */
+.lab-el-para {
+  display: block;
+  color: var(--text-muted);
+  line-height: 1.55;
+  overflow: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+
+.lab-el-para[data-size='1'] { font-size: clamp(0.7rem, 2.2cqw, 0.85rem); }
+.lab-el-para[data-size='2'] { font-size: clamp(0.8rem, 2.7cqw, 0.95rem); }
+.lab-el-para[data-size='3'] { font-size: clamp(0.88rem, 3.2cqw, 1.1rem); }
+.lab-el-para[data-size='4'] { font-size: clamp(1rem, 3.9cqw, 1.35rem); }
+.lab-el-para[data-size='5'] { font-size: clamp(1.15rem, 4.8cqw, 1.6rem); }
+
+.lab-el-para[data-align='left']   { text-align: left; }
+.lab-el-para[data-align='center'] { text-align: center; }
+.lab-el-para[data-align='right']  { text-align: right; }
+
+.lab-el-para p + p { margin-top: 0.75em; }
+.lab-el-para strong { color: var(--text); font-weight: 700; }
+
+.lab-el-para a {
+  color: var(--blue-mid);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.lab-el-para a:hover { color: var(--green); }
+
+/* object-fit means a box that changes shape crops or letterboxes the image
+   rather than stretching it, which is what makes one layout survive two very
+   different screens. */
+.lab-el-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  padding: 0.5em 1.1em;
+  font-family: inherit;
+  font-size: clamp(0.8rem, 3cqw, 1.05rem);
+  color: var(--teal);
+  text-decoration: none;
+  background: none;
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.lab-btn:hover {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+/* a button whose destination was refused — it stays visible so the author sees
+   the mistake, but it doesn't pretend to be pressable */
+.lab-btn.is-dead {
+  color: var(--text-muted);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lab-btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A pale tunnel needs dark text; layout elements follow the same rule. */
+.lab-tunnel.is-light .lab-el-title,
+.lab-tunnel.is-light .lab-el-line,
+.lab-tunnel.is-light .lab-el-para { color: var(--card-bg); }
 
 .lab-link {
   display: block;
@@ -448,23 +469,5 @@ a.lab-link:hover .lab-title {
 
   .lab-page[style*="lab-flicker"] {
     animation: none !important;
-  }
-}
-
-@media (min-width: 640px) {
-  .category {
-    padding: 1.5rem;
-  }
-
-  .links {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-  }
-}
-
-@media (min-width: 900px) {
-  .links {
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   }
 }
