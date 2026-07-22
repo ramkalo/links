@@ -46,10 +46,17 @@ stack. **Legacy blocks have no `layout` and render exactly as they always did** 
 block, which is why `map.js` stays small.
 
 Elements sit on a **12 × 20 grid** (`GRID` in `labyrinth.js`) with `x`, `y`, `w`, `h` in grid units,
-0-indexed. Types and their caps (`EL_LIMITS`): **title 1, line 2, para 2, image 3, button 1.**
+0-indexed. Types: `title`, `line`, `para`, `image`, `button`, **10 of each** (`EL_LIMITS`) — a
+backstop against an unreadable block rather than a design rule, since the grid runs out first.
 Shared optional fields: `size` 1–5, `align`, `valign`, `href`. `image` takes `src` / `alt` / `fit`;
 `button` takes `action` (`url` / `goto` / `random`) and `to`. Anything equal to `EL_DEFAULTS` is
 left out when serialising, so the map file doesn't carry a wall of defaults.
+
+**Clicking an image** opens it full-screen in `.lab-lightbox` — an image boxed into a few grid cells
+is too small for anything with detail in it. This only applies to images with **no `href`**: one the
+author gave a link to is a link and goes where they pointed it, and `buildElement()` marks the
+others `.is-zoomable`. While the lightbox is open `move()` refuses, so a swipe can't change the
+block out from under the picture; `showCell()` closes it so it can never outlive its block.
 
 The canvas fills the **full screen height** and up to **900px of width**, centred, with the block
 background bleeding past it. That's deliberate: it narrows the aspect range a layout must survive

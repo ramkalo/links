@@ -188,6 +188,59 @@ a.lab-el-link:hover .lab-el-text { color: var(--teal); }
   height: 100%;
 }
 
+/* An image with no link of its own opens full-screen instead. One that has a
+   link is a link, and goes where the author pointed it. */
+.lab-el-img.is-zoomable {
+  cursor: zoom-in;
+}
+
+.lab-lightbox {
+  position: absolute;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(0, 0, 0, 0.92);
+  cursor: zoom-out;
+  animation: lab-lightbox-in 0.18s ease;
+}
+
+.lab-lightbox[hidden] {
+  display: none;
+}
+
+.lab-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.lab-lightbox-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.35rem 0.6rem;
+  font-family: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+}
+
+.lab-lightbox-close:hover {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+@keyframes lab-lightbox-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 .lab-btn {
   display: inline-flex;
   align-items: center;
@@ -469,5 +522,9 @@ a.lab-link:hover .lab-title {
 
   .lab-page[style*="lab-flicker"] {
     animation: none !important;
+  }
+
+  .lab-lightbox {
+    animation: none;
   }
 }

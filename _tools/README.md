@@ -52,10 +52,11 @@ Press **✎** on a block for layout mode. The map disappears behind a scale draw
 block itself and the side panel becomes a palette. A block that has never been arranged
 gets one built from whatever it already said, so you're always editing something.
 
-Elements sit on a **12 by 20 grid**. You get **one title, two single lines, two
-paragraphs, three images and one button** — the caps are the point, not a limitation to
-work around. Drag an element to move it, drag its bottom-right corner to resize, or type
-the numbers in. Arrow keys nudge the selected one a cell at a time; delete removes it.
+Elements sit on a **12 by 20 grid**. You get up to **ten of each kind** — title, single
+line, paragraph, image, button. In practice the grid runs out well before the count does,
+which is the real limit. Drag an element to move it, drag its bottom-right corner to
+resize, or type the numbers in. Arrow keys nudge the selected one a cell at a time; delete
+removes it.
 
 **phone / desktop** at the top redraws the same block at the two extremes of what a real
 screen can be. Check both — that's the whole reason the toggle is there.
@@ -92,6 +93,14 @@ work too, but the host can take the picture away and will see who's visiting you
 **fit** decides what happens when the box isn't the same shape as the picture — `contain`
 fits the whole thing in and leaves gaps, `cover` fills the box and crops, `fill` stretches
 it out of shape. `contain` unless you have a reason.
+
+**Clicking an image opens it full-screen**, because a few grid cells is nowhere near
+enough for anything with detail in it. Tap anywhere, press escape, or hit the ✕ to close.
+Swiping does nothing while it's open, so nobody loses the picture by trying to look at it.
+
+The exception is an image you gave a **link** to — that's a link, so clicking it goes where
+you pointed it. Leave the link empty for the full-screen behaviour. The hint under the
+link field tells you which one you're getting.
 
 ### The button
 

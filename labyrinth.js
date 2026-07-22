@@ -22,11 +22,12 @@
   /* --------------------------------------------------------------- layouts */
 
   /* A block can arrange its contents on a grid this size instead of using the
-     one fixed centred stack. The caps are deliberate: a block that can hold
-     anything stops being a block. */
+     one fixed centred stack. The caps are a backstop against a block nobody can
+     read rather than a design rule — there is only so much room on one screen,
+     and the grid runs out long before the count does. */
   var GRID = { cols: 12, rows: 20 };
   var EL_TYPES = ['title', 'line', 'para', 'image', 'button'];
-  var EL_LIMITS = { title: 1, line: 2, para: 2, image: 3, button: 1 };
+  var EL_LIMITS = { title: 10, line: 10, para: 10, image: 10, button: 10 };
   var EL_DEFAULTS = { size: 3, align: 'center', valign: 'middle', fit: 'contain' };
   var BUTTON_ACTIONS = ['url', 'goto', 'random'];
 
@@ -422,7 +423,7 @@
   var previewing = false;  /* running inside the editor's test button */
   var onPreviewExit = null;
 
-  var root, stage, veil, pack, inventory, flavorLine;
+  var root, stage, veil, pack, inventory, flavorLine, lightbox;
 
   /* ------------------------------------------------------------- rendering */
 
@@ -461,7 +462,13 @@
       if (!src) return '';
       if (!/^(https?:|mailto:)/i.test(src)) src = base + src;
 
-      var img = '<img class="lab-el-img" src="' + escapeHtml(src) + '"' +
+      /* An image the author gave a link to is a link — clicking it should go
+         where they said. Everything else is a picture in a box too small to see
+         properly, so clicking it opens the big version instead. */
+      var zoom = !safeUrl(el.href);
+
+      var img = '<img class="lab-el-img' + (zoom ? ' is-zoomable' : '') + '"' +
+        ' src="' + escapeHtml(src) + '"' +
         ' alt="' + escapeHtml(el.alt || '') + '"' +
         ' style="object-fit:' + escapeHtml(elSetting(el, 'fit')) + '">';
       return wrapHref(el, img);
@@ -554,6 +561,7 @@
     var old = stage.querySelector('.lab-page');
     var page = buildPage(cell);
 
+    closeLightbox(); /* never let a picture outlive the block it was on */
     current = cell;
     remember(cell);
 
@@ -722,7 +730,7 @@
   }
 
   function move(dir) {
-    if (!active || moving) return;
+    if (!active || moving || lightboxOpen()) return;
 
     var next = index.resolveExit(current, dir);
     if (!next) {
@@ -759,6 +767,33 @@
     page.classList.remove('is-bouncing-up', 'is-bouncing-down', 'is-bouncing-left', 'is-bouncing-right');
     void page.offsetWidth; /* restart the animation */
     page.classList.add('is-bouncing-' + dir);
+  }
+
+  /* ----------------------------------------------------------- the lightbox */
+
+  /* An image on a block is boxed into a few grid cells, which is nowhere near
+     enough for anything with detail in it. Clicking one puts it up full-screen.
+     While it's open nothing else responds: a swipe would otherwise change block
+     out from under the picture you're looking at. */
+  function openLightbox(src, alt) {
+    if (!lightbox) return;
+
+    lightbox.innerHTML =
+      '<img class="lab-lightbox-img" src="' + escapeHtml(src) + '" alt="' + escapeHtml(alt || '') + '">' +
+      '<button class="lab-lightbox-close" aria-label="close">✕</button>';
+
+    lightbox.hidden = false;
+  }
+
+  function closeLightbox() {
+    if (!lightbox || lightbox.hidden) return;
+
+    lightbox.hidden = true;
+    lightbox.innerHTML = '';
+  }
+
+  function lightboxOpen() {
+    return !!lightbox && !lightbox.hidden;
   }
 
   /* --------------------------------------------------------------- the pack */
@@ -870,6 +905,7 @@
     root.hidden = true;
     stage.innerHTML = '';
     toggleInventory(false);
+    closeLightbox();
 
     var done = onPreviewExit;
     previewing = false;
@@ -896,7 +932,7 @@
     var swiped = false;
 
     stage.addEventListener('pointerdown', function (e) {
-      tracking = !inScrollable(e.target);
+      tracking = !inScrollable(e.target) && !lightboxOpen();
       swiped = false;
       startX = e.clientX;
       startY = e.clientY;
@@ -937,6 +973,12 @@
         return;
       }
 
+      var zoomable = e.target.closest('.lab-el-img.is-zoomable');
+      if (zoomable) {
+        openLightbox(zoomable.getAttribute('src'), zoomable.getAttribute('alt'));
+        return;
+      }
+
       var button = e.target.closest('.lab-btn');
       if (!button) return;
 
@@ -950,7 +992,9 @@
       if (!active) return;
 
       if (e.key === 'Escape') {
-        toggleInventory(false);
+        /* the picture is the thing in front of you — close that first */
+        if (lightboxOpen()) closeLightbox();
+        else toggleInventory(false);
         return;
       }
       var dir = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
@@ -977,18 +1021,23 @@
       '<div class="lab-stage" id="lab-stage"></div>' +
       '<div class="lab-veil" id="lab-veil"></div>' +
       '<button class="lab-pack" id="lab-pack" aria-expanded="false" aria-label="backpack">🎒</button>' +
-      '<div class="lab-inventory" id="lab-inventory" hidden></div>';
+      '<div class="lab-inventory" id="lab-inventory" hidden></div>' +
+      '<div class="lab-lightbox" id="lab-lightbox" hidden></div>';
 
     stage = root.querySelector('#lab-stage');
     veil = root.querySelector('#lab-veil');
     pack = root.querySelector('#lab-pack');
     inventory = root.querySelector('#lab-inventory');
+    lightbox = root.querySelector('#lab-lightbox');
 
     buildInventory();
     bindGestures();
     bindKeys();
 
     pack.addEventListener('click', function () { toggleInventory(); });
+
+    /* anywhere at all — the picture, the backdrop, the ✕ */
+    lightbox.addEventListener('click', closeLightbox);
 
     inventory.addEventListener('click', function (e) {
       var slot = e.target.closest('.lab-slot');

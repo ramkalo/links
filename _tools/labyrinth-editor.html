@@ -711,9 +711,10 @@
         </div>
 
         <div class="field" id="el-href-field">
-          <label>link (optional — makes the whole element clickable)</label>
+          <label id="el-href-label">link (optional — makes the whole element clickable)</label>
           <select id="f-el-hreflink"></select>
           <input id="f-el-href" type="text" placeholder="https://…" style="margin-top:0.25rem">
+          <p class="hint" id="el-href-hint"></p>
         </div>
 
         <div class="field" id="el-size-field">
@@ -2011,18 +2012,36 @@
 
   /* --------------------------------------------------- add / pick / remove */
 
-  /* Somewhere free-ish to drop a new element, so two in a row don't land on top
-     of each other. Walks down the grid looking for a band nothing else uses. */
+  /* Somewhere free to drop a new element, so adding several in a row doesn't
+     stack them all on the same square. Works down the grid a row at a time,
+     trying the middle of each row first — that's where you'd have put it — and
+     only then shuffling sideways. */
   function freeSpot(w, h) {
     var used = layList();
+    var middle = Math.floor((L.GRID.cols - w) / 2);
+
+    function taken(x, y) {
+      return used.some(function (el) {
+        return !(el.x + el.w <= x || el.x >= x + w ||
+                 el.y + el.h <= y || el.y >= y + h);
+      });
+    }
 
     for (var y = 0; y + h <= L.GRID.rows; y++) {
-      var clash = used.some(function (el) {
-        return !(el.y + el.h <= y || el.y >= y + h);
-      });
-      if (!clash) return { x: Math.floor((L.GRID.cols - w) / 2), y: y };
+      if (!taken(middle, y)) return { x: middle, y: y };
+
+      for (var x = 0; x + w <= L.GRID.cols; x++) {
+        if (!taken(x, y)) return { x: x, y: y };
+      }
     }
-    return { x: Math.floor((L.GRID.cols - w) / 2), y: 0 };
+
+    /* the grid is genuinely full — offset it a little so the new one is at least
+       visibly on top of the pile rather than hidden exactly behind it */
+    var n = used.length;
+    return {
+      x: Math.max(0, Math.min(n % 4, L.GRID.cols - w)),
+      y: Math.max(0, Math.min(n % 5, L.GRID.rows - h))
+    };
   }
 
   var NEW_ELEMENT = {
@@ -2264,6 +2283,13 @@
     if (!document.getElementById('el-href-field').hidden) {
       document.getElementById('f-el-href').value = el.href || '';
       fillLinkSelect(document.getElementById('f-el-hreflink'), el.href || '');
+
+      /* an image with no link of its own opens full-screen when tapped, so the
+         link field is really a choice between two click behaviours */
+      document.getElementById('el-href-hint').textContent = el.type !== 'image' ? ''
+        : el.href
+          ? 'clicking it follows this link. clear the link and it opens full-screen instead.'
+          : 'no link, so clicking it opens the image full-screen.';
     }
 
     segment('f-el-size', 'size', String(el.size === undefined ? L.EL_DEFAULTS.size : el.size));
@@ -2552,10 +2578,12 @@
   var decoySrc = ['images/wall.jpg', 'images/door.png', 'images/floor.jpg', 'images/dark.png'];
 
   function decoyOf(maze) {
-    /* text-only pages have no link to rotate, so draw the decoy's links from the
-       ones that do exist — otherwise the decoy serialises a literal "undefined" */
-    var urls = maze.cells.map(function (c) { return c.link; }).filter(Boolean);
-    if (!urls.length) urls = allLinks().map(function (l) { return l.url; });
+    /* Rotate against the whole catalogue rather than just the urls sitting on
+       cells. Once blocks carry their links inside a layout there may be only one
+       cell.link in the entire map — and a pool of one rotates onto itself, so
+       the decoy would end up telling the truth. */
+    var urls = allLinks().map(function (l) { return l.url; });
+    if (!urls.length) urls = maze.cells.map(function (c) { return c.link; }).filter(Boolean);
     if (!urls.length) urls = [''];
 
     var cells = maze.cells.map(function (c, i) {
