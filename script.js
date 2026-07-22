@@ -151,7 +151,17 @@ const data = {
   ]
 };
 
-render(data);
+// Only paint when there's a page to paint into — the labyrinth editor loads this
+// file just to get at `data`.
+function mount() {
+  if (document.getElementById('categories')) render(data);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', mount);
+} else {
+  mount();
+}
 
 function render(data) {
   document.title = data.title || 'My Projects';

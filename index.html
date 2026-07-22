@@ -12,9 +12,14 @@
       link.href = 'styles.css?v=' + v;
       document.head.appendChild(link);
 
-      var script = document.createElement('script');
-      script.src = 'script.js?v=' + v;
-      document.head.appendChild(script);
+      // async = false keeps them running in order, so labyrinth.js can count on
+      // script.js having already defined the link data.
+      ['script.js', 'labyrinth.js'].forEach(function(src) {
+        var script = document.createElement('script');
+        script.src = src + '?v=' + v;
+        script.async = false;
+        document.head.appendChild(script);
+      });
     })();
   </script>
 </head>
@@ -33,8 +38,10 @@
 
   <footer class="footer" id="page-footer">
     <p><a href="https://github.com/ramkalo/Linkinator" target="_blank" rel="noopener noreferrer">build your own site like this</a> &lt;- visit this link and follow the "README" section </p>
+    <button type="button" id="labyrinth-toggle" class="labyrinth-toggle">enter the labyrinth</button>
   </footer>
 
+  <div id="labyrinth" class="labyrinth" hidden></div>
 
 </body>
 </html>

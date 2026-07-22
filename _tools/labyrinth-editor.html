@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>labyrinth editor</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #3B4252;
+    --card-bg: #2E3440;
+    --border: #434C5E;
+    --text: #ECEFF4;
+    --muted: #D8DEE9;
+    --green: #7ECF4E;
+    --teal: #4ECFCD;
+    --blue: #45C8E0;
+    --red: #E06C75;
+    --amber: #E5C07B;
+  }
+
+  body {
+    font-family: 'JetBrains Mono', Monaco, 'Courier New', monospace;
+    font-size: 13px;
+    background: var(--card-bg);
+    color: var(--text);
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+
+    /* dragging a page across the grid would otherwise smear a text selection
+       across every label and "+" it passes over */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  input, textarea {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  h1 { font-size: 0.95rem; color: var(--green); margin-right: auto; }
+
+  button, select, input, textarea {
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.55rem;
+  }
+
+  button { cursor: pointer; }
+  button:hover { border-color: var(--green); }
+  button.primary { border-color: var(--green); color: var(--green); }
+
+  main { display: grid; grid-template-columns: 1fr 20rem; overflow: hidden; }
+
+  #canvas {
+    position: relative;
+    overflow: auto;
+    padding: 2rem;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 39px, rgba(255,255,255,.03) 39px 40px),
+      repeating-linear-gradient(90deg, transparent 0 39px, rgba(255,255,255,.03) 39px 40px);
+  }
+
+  #grid { position: relative; }
+
+  #wires { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+
+  .slot {
+    position: absolute;
+    border: 1px dashed rgba(255,255,255,.09);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,.18);
+    cursor: cell;
+  }
+
+  .slot:hover { border-color: var(--teal); color: var(--teal); }
+  .slot.drop-target { background: rgba(126,207,78,.12); border-color: var(--green); }
+
+  .cell {
+    position: absolute;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    padding: 4px;
+    overflow: hidden;
+    cursor: grab;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.25;
+  }
+
+  .cell:hover { border-color: var(--teal); }
+  .cell.selected { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+  .cell.dragging { opacity: 0.4; cursor: grabbing; }
+  .cell.unreachable { border-color: var(--red); }
+  .cell.blank { border-style: dashed; }
+  .cell.blank .cell-name { color: var(--muted); }
+  .cell.tunnel { border-style: dashed; border-color: var(--amber); }
+  .cell.tunnel .cell-name { color: var(--amber); }
+  .cell.tunnel .cell-tags { color: var(--amber); }
+  .cell.drop-target { background: rgba(229,192,123,.18); border-color: var(--amber); }
+
+  .cell-edit {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    padding: 1px 4px;
+    font-size: 10px;
+    line-height: 1.4;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    opacity: 0;
+    transition: opacity .1s;
+  }
+
+  .cell:hover .cell-edit, .cell.selected .cell-edit { opacity: 1; }
+
+  .cell-name {
+    font-size: 10px;
+    color: var(--blue);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+
+  .cell-tags { margin-top: auto; font-size: 9px; color: var(--muted); opacity: .8; }
+  .cell-start { color: var(--green); }
+
+  aside {
+    border-left: 1px solid var(--border);
+    background: var(--bg);
+    overflow-y: auto;
+    padding: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  aside h2 {
+    font-size: 0.7rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 0.5rem;
+  }
+
+  .tabs { display: flex; gap: 0.3rem; }
+
+  .tab {
+    flex: 1;
+    font-size: 11px;
+    padding: 0.4rem 0.2rem;
+    color: var(--muted);
+    background: none;
+    border-color: transparent;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .tab:hover { color: var(--text); border-bottom-color: var(--teal); }
+  .tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+  .tab-badge {
+    display: inline-block;
+    min-width: 1.1em;
+    margin-left: 0.3em;
+    padding: 0 0.25em;
+    font-size: 10px;
+    color: var(--card-bg);
+    background: var(--red);
+  }
+
+  .tab-badge[hidden] { display: none; }
+
+  .pane[hidden] { display: none; }
+
+  .link-group {
+    font-size: 9px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    opacity: .6;
+    margin: 0.7rem 0 0.3rem;
+  }
+
+  .link-card {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    width: 100%;
+    text-align: left;
+    font-size: 11px;
+    padding: 0.35rem 0.45rem;
+    margin-bottom: 0.25rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .link-card.unused { border-color: var(--red); color: var(--text); }
+  .link-card.blank { border-style: dashed; border-color: var(--teal); color: var(--teal); margin-bottom: 0.6rem; }
+  .link-card.blank .count { color: var(--teal); opacity: .7; }
+  .link-card.tunnel { border-style: dashed; border-color: var(--amber); color: var(--amber); margin-bottom: 0.6rem; }
+  .link-card.tunnel .count { color: var(--amber); opacity: .7; }
+
+  .tunnel-row { display: flex; gap: 0.5rem; }
+  .tunnel-row span { flex: 1; }
+  .tunnel-row input { width: 100%; }
+  #f-color { height: 26px; padding: 1px; }
+
+  .weight-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; }
+  .weight-row label { flex: 1; margin: 0; font-size: 10px; }
+  .weight-row input { width: 4rem; }
+  .weight-row .odds { width: 3rem; text-align: right; font-size: 10px; color: var(--teal); }
+  .weight-row.is-back label { color: var(--amber); }
+  .link-card.placed { opacity: .45; }
+  .link-card:hover { border-color: var(--teal); }
+  .link-card .count { margin-left: auto; font-size: 9px; color: var(--muted); }
+  .link-card.unused .count { color: var(--red); }
+
+  .drag-ghost {
+    position: fixed;
+    z-index: 50;
+    pointer-events: none;
+    font-size: 11px;
+    padding: 0.3rem 0.5rem;
+    background: var(--card-bg);
+    border: 1px solid var(--green);
+    opacity: .9;
+  }
+
+  .field { margin-bottom: 0.55rem; }
+  .field label { display: block; font-size: 10px; color: var(--muted); margin-bottom: 0.2rem; }
+  .field select, .field input { width: 100%; }
+
+  .exits { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+
+  .row { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
+  .row button { flex: 1; }
+
+  .issue { font-size: 11px; margin-bottom: 0.35rem; color: var(--muted); }
+  .issue.bad { color: var(--red); }
+  .issue.warn { color: var(--amber); }
+  .issue.ok { color: var(--green); }
+
+  .hint { font-size: 10px; color: var(--muted); opacity: .7; line-height: 1.5; }
+
+  dialog {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--green);
+    width: min(52rem, 92vw);
+    padding: 1rem;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.65); }
+  dialog textarea { width: 100%; height: 55vh; resize: vertical; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>labyrinth editor</h1>
+  <button id="load-live">load live map</button>
+  <button id="import">import map code</button>
+  <label class="hint">zoom <input id="zoom" type="range" min="60" max="200" value="110" step="10"></label>
+  <button id="test" class="primary" title="walk the draft map right here. starts on the selected block if it's a chamber, otherwise the start block. leave via the backpack → escape rope.">test</button>
+  <button id="export" class="primary">copy map code</button>
+</header>
+
+<main>
+  <div id="canvas"><div id="grid"><svg id="wires"></svg></div></div>
+
+  <aside>
+    <div class="tabs">
+      <button class="tab active" data-tab="block">block</button>
+      <button class="tab" data-tab="place">place</button>
+      <button class="tab" data-tab="problems">problems<span class="tab-badge" id="problem-count" hidden></span></button>
+    </div>
+
+    <section class="pane" data-pane="block">
+      <p class="hint" id="no-selection">click a block to select it, or its ✎ button to edit it here. cmd/ctrl-click to select several. drag to move, delete key to remove.</p>
+
+      <div id="bulk" hidden>
+        <p><span id="bulk-count">0</span> blocks selected</p>
+        <p class="hint">drag any one of them to move the whole group. delete removes them all. escape clears the selection.</p>
+        <div class="row">
+          <button id="delete-selected">delete all</button>
+        </div>
+      </div>
+      <div id="editor" hidden>
+        <div class="field" id="link-field">
+          <label>link</label>
+          <select id="f-link"></select>
+        </div>
+
+        <div id="tunnel-fields" hidden>
+          <div class="field tunnel-row">
+            <span><label>color</label><input id="f-color" type="color" value="#000000"></span>
+            <span><label>on screen (s)</label><input id="f-ms" type="number" min="0" max="30" step="0.1" value="0.5"></span>
+            <span><label>transition (s)</label><input id="f-fx" type="number" min="0" max="10" step="0.1" value="0.35"></span>
+          </div>
+          <div class="field">
+            <label>effect</label>
+            <select id="f-effect"></select>
+            <p class="hint" id="tunnel-total"></p>
+          </div>
+          <div class="field">
+            <label>odds — relative weights, not percentages. the way you came in is governed by "back", whichever direction that turns out to be</label>
+            <div id="f-weights"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>title override (optional — this is where you lie)</label>
+          <input id="f-title" type="text" placeholder="uses the link's own title">
+        </div>
+        <div class="field">
+          <label>note (optional)</label>
+          <input id="f-note" type="text" placeholder="cryptic aside">
+        </div>
+        <div class="field">
+          <label>exits — auto follows the grid, wall seals it, a block id is a wormhole</label>
+          <div class="exits">
+            <select id="f-up"></select>
+            <select id="f-down"></select>
+            <select id="f-left"></select>
+            <select id="f-right"></select>
+          </div>
+        </div>
+        <div class="row">
+          <button id="make-start">make start</button>
+          <button id="delete-cell">delete</button>
+        </div>
+        <p class="hint">the delete key does the same thing.</p>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="place" hidden>
+      <p class="hint">drag a card onto an empty square to add it. drop it on an existing block to swap that block's link.</p>
+      <div id="deck"></div>
+    </section>
+
+    <section class="pane" data-pane="problems" hidden>
+      <div id="problems"></div>
+    </section>
+  </aside>
+</main>
+
+<dialog id="io">
+  <textarea id="io-text" spellcheck="false"></textarea>
+  <div class="row">
+    <button id="io-apply" hidden>use this map</button>
+    <button id="io-close">close</button>
+  </div>
+  <p class="hint" id="io-hint"></p>
+</dialog>
+
+<!-- labyrinth.js builds its overlay into this, which is what the test button drives -->
+<div id="labyrinth" class="labyrinth" hidden></div>
+
+<!-- script.js for the links, labyrinth.js for the movement rules and the codec -->
+<script src="../script.js"></script>
+<script src="../labyrinth.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var L = window.Labyrinth;
+  var DIRS = L.DIR_NAMES;
+  var STORE = 'labyrinth-editor-draft';
+  var PAD = 2;
+
+  var state = { maze: null, selection: [], size: 110, tab: 'block', origin: { x0: 0, y0: 0 } };
+
+  /* Selection is a list, not a single id — cmd/ctrl-click adds to it. The last
+     entry is the "primary" one, which is what the block tab edits. */
+  function primaryId() {
+    return state.selection.length ? state.selection[state.selection.length - 1] : null;
+  }
+
+  function isSelected(id) {
+    return state.selection.indexOf(id) !== -1;
+  }
+
+  function selectOnly(id) {
+    state.selection = id ? [id] : [];
+  }
+
+  function toggleSelected(id) {
+    var at = state.selection.indexOf(id);
+    if (at === -1) state.selection.push(id);
+    else state.selection.splice(at, 1);
+  }
+
+  function selectedCells() {
+    var byId = L.indexMaze(state.maze).byId;
+    return state.selection.map(function (id) { return byId.get(id); }).filter(Boolean);
+  }
+
+  /* ------------------------------------------------------------------ links */
+
+  function allLinks() {
+    var out = [];
+    (typeof data !== 'undefined' ? data.categories || [] : []).forEach(function (cat) {
+      (cat.links || []).forEach(function (link) {
+        out.push({ category: cat.name, title: link.title, url: link.url });
+      });
+    });
+    return out;
+  }
+
+  function linkTitle(url) {
+    if (!url) return '';
+    var hit = allLinks().filter(function (l) { return l.url === url; })[0];
+    return hit ? hit.title : url;
+  }
+
+  /* ------------------------------------------------------------------ state */
+
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify(state.maze)); } catch (err) { /* full or blocked */ }
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE);
+      if (raw) return JSON.parse(raw);
+    } catch (err) { /* corrupt draft */ }
+    return null;
+  }
+
+  function nextId() {
+    var n = 0;
+    var used = new Set(state.maze.cells.map(function (c) { return c.id; }));
+    while (used.has('c' + n)) n++;
+    return 'c' + n;
+  }
+
+  function newTunnel() {
+    return {
+      color: L.TUNNEL_DEFAULTS.color,
+      ms: L.TUNNEL_DEFAULTS.ms,
+      fx: L.TUNNEL_DEFAULTS.fx,
+      effect: L.TUNNEL_DEFAULTS.effect,
+      back: L.TUNNEL_DEFAULTS.back
+    };
+  }
+
+  function cellAt(x, y) {
+    return state.maze.cells.filter(function (c) { return c.x === x && c.y === y; })[0] || null;
+  }
+
+  function bounds() {
+    if (!state.maze.cells.length) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    var xs = state.maze.cells.map(function (c) { return c.x; });
+    var ys = state.maze.cells.map(function (c) { return c.y; });
+    return {
+      minX: Math.min.apply(null, xs), maxX: Math.max.apply(null, xs),
+      minY: Math.min.apply(null, ys), maxY: Math.max.apply(null, ys)
+    };
+  }
+
+  /* --------------------------------------------------------------- drawing */
+
+  var grid = document.getElementById('grid');
+  var wires = document.getElementById('wires');
+
+  function draw() {
+    var b = bounds();
+    var x0 = b.minX - PAD, x1 = b.maxX + PAD;
+    var y0 = b.minY - PAD, y1 = b.maxY + PAD;
+    var size = state.size;
+
+    grid.style.width = ((x1 - x0 + 1) * size) + 'px';
+    grid.style.height = ((y1 - y0 + 1) * size) + 'px';
+
+    var px = function (x) { return (x - x0) * size; };
+    var py = function (y) { return (y - y0) * size; };
+
+    /* kept so a drag can work out which square the pointer is over without
+       having to ask what element happens to be under it */
+    state.origin = { x0: x0, y0: y0 };
+
+    var index = L.indexMaze(state.maze);
+    var live = L.reachableFrom(index, state.maze.start);
+
+    Array.prototype.slice.call(grid.children).forEach(function (node) {
+      if (node !== wires) node.remove();
+    });
+
+    for (var y = y0; y <= y1; y++) {
+      for (var x = x0; x <= x1; x++) {
+        if (cellAt(x, y)) continue;
+        var slot = document.createElement('div');
+        slot.className = 'slot';
+        slot.style.cssText = 'left:' + px(x) + 'px;top:' + py(y) + 'px;width:' + size + 'px;height:' + size + 'px';
+        slot.dataset.x = x;
+        slot.dataset.y = y;
+        slot.textContent = '+';
+        grid.appendChild(slot);
+      }
+    }
+
+    state.maze.cells.forEach(function (cell) {
+      var tunnel = L.isTunnel(cell);
+      var el = document.createElement('div');
+      el.className = 'cell' +
+        (isSelected(cell.id) ? ' selected' : '') +
+        (tunnel ? ' tunnel' : cell.link ? '' : ' blank') +
+        (live.has(cell.id) ? '' : ' unreachable');
+
+      if (tunnel) {
+        el.style.background = cell.tunnel.color || L.TUNNEL_DEFAULTS.color;
+      }
+      el.style.cssText = 'left:' + (px(cell.x) + 3) + 'px;top:' + (py(cell.y) + 3) + 'px;width:' +
+        (size - 6) + 'px;height:' + (size - 6) + 'px';
+      el.dataset.id = cell.id;
+      el.dataset.x = cell.x;
+      el.dataset.y = cell.y;
+
+      var tags = [];
+      if (state.maze.start === cell.id) tags.push('<span class="cell-start">start</span>');
+      if (tunnel) tags.push((Math.round(tunnelSeconds(cell).total * 100) / 100) + 's');
+      else if (!cell.link) tags.push('text');
+      if (cell.exits) {
+        DIRS.forEach(function (dir) {
+          if (!cell.exits.hasOwnProperty(dir)) return;
+          tags.push(dir[0].toUpperCase() + (cell.exits[dir] === null ? '✕' : '→'));
+        });
+      }
+      if (cell.title) tags.push('lie');
+
+      el.innerHTML =
+        '<button class="cell-edit" data-edit="' + cell.id + '" title="edit this block">✎</button>' +
+        '<div class="cell-name">' + esc(cell.title || linkTitle(cell.link) || (tunnel ? '(tunnel)' : '(blank)')) + '</div>' +
+        '<div class="cell-tags">' + cell.id + ' ' + tags.join(' ') + '</div>';
+      grid.appendChild(el);
+    });
+
+    drawWires(index, px, py, size);
+    renderPanel(index, live);
+    save();
+  }
+
+  function drawWires(index, px, py, size) {
+    var lines = '';
+    state.maze.cells.forEach(function (cell) {
+      if (!cell.exits) return;
+      DIRS.forEach(function (dir) {
+        var target = cell.exits[dir];
+        if (!target) return;
+        var to = index.byId.get(target);
+        if (!to) return;
+        lines +=
+          '<line x1="' + (px(cell.x) + size / 2) + '" y1="' + (py(cell.y) + size / 2) +
+          '" x2="' + (px(to.x) + size / 2) + '" y2="' + (py(to.y) + size / 2) +
+          '" stroke="#E5C07B" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#head)" opacity=".8"/>';
+      });
+    });
+
+    wires.setAttribute('width', grid.style.width);
+    wires.setAttribute('height', grid.style.height);
+    wires.innerHTML =
+      '<defs><marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">' +
+      '<path d="M0,0 L10,5 L0,10 z" fill="#E5C07B"/></marker></defs>' + lines;
+  }
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : s;
+    return d.innerHTML;
+  }
+
+  /* ------------------------------------------------------------- validation */
+
+  function validate(index, live) {
+    var out = [];
+
+    state.maze.cells.forEach(function (cell) {
+      if (!live.has(cell.id)) {
+        out.push(['bad', cell.id + ' (' + cell.x + ',' + cell.y + ') can’t be reached from the start']);
+      }
+      if (cell.exits) {
+        DIRS.forEach(function (dir) {
+          var t = cell.exits[dir];
+          if (t && !index.byId.get(t)) out.push(['bad', cell.id + ' → ' + dir + ' points at ' + t + ', which no longer exists']);
+        });
+      }
+      if (cell.link && !allLinks().some(function (l) { return l.url === cell.link; })) {
+        out.push(['warn', cell.id + ' uses a link that isn’t in script.js any more']);
+      }
+      if (!L.isTunnel(cell) && !cell.link && !cell.title && !cell.note) {
+        out.push(['warn', cell.id + ' is a blank block with nothing written on it']);
+      }
+
+      if (L.isTunnel(cell)) {
+        if (cell.link) out.push(['bad', cell.id + ' is a tunnel with a link on it — tunnels are passed through, never read']);
+
+        /* A tunnel that never reaches a chamber leaves a visitor stuck in an
+           endless transition, which looks like the site has crashed. */
+        var route = L.tunnelRoute(index, cell, null, function () { return 0.5; });
+        if (!route.dest) {
+          out.push(['bad', cell.id + ' never reaches a chamber — it would trap whoever walks in']);
+        }
+      }
+    });
+
+    var seen = {};
+    state.maze.cells.forEach(function (cell) {
+      var key = cell.x + ',' + cell.y;
+      if (seen[key]) out.push(['bad', 'two blocks stacked on ' + key]);
+      seen[key] = true;
+    });
+
+    if (!state.maze.cells.length) out.push(['warn', 'no blocks yet']);
+    else if (!index.byId.get(state.maze.start)) out.push(['bad', 'no start block set']);
+    else if (L.isTunnel(index.byId.get(state.maze.start))) {
+      out.push(['bad', 'the start block is a tunnel — visitors would arrive mid-transition']);
+    }
+
+    return out;
+  }
+
+  /* how many pages currently use each link url */
+  function placementCounts() {
+    var counts = new Map();
+    state.maze.cells.forEach(function (cell) {
+      if (cell.link) counts.set(cell.link, (counts.get(cell.link) || 0) + 1);
+    });
+    return counts;
+  }
+
+  function renderPanel(index, live) {
+    var issues = validate(index, live);
+
+    document.getElementById('problems').innerHTML = issues.length
+      ? issues.map(function (p) { return '<div class="issue ' + p[0] + '">' + esc(p[1]) + '</div>'; }).join('')
+      : '<div class="issue ok">all good</div>';
+
+    var badge = document.getElementById('problem-count');
+    badge.textContent = issues.length;
+    badge.hidden = !issues.length;
+
+    var counts = placementCounts();
+    var groups = {};
+    allLinks().forEach(function (l) { (groups[l.category] = groups[l.category] || []).push(l); });
+
+    var blankCard =
+      '<button class="link-card blank" data-url="">' +
+        '<span>blank block</span><span class="count">text only</span>' +
+      '</button>' +
+      '<button class="link-card tunnel" data-url="" data-tunnel="1">' +
+        '<span>tunnel block</span><span class="count">pass through</span>' +
+      '</button>';
+
+    document.getElementById('deck').innerHTML = blankCard + Object.keys(groups).map(function (cat) {
+      return '<p class="link-group">' + esc(cat) + '</p>' + groups[cat].map(function (l) {
+        var n = counts.get(l.url) || 0;
+        return '<button class="link-card ' + (n ? 'placed' : 'unused') + '" data-url="' + esc(l.url) + '">' +
+          '<span>' + esc(l.title) + '</span>' +
+          '<span class="count">' + (n === 0 ? 'unused' : n > 1 ? '×' + n : 'placed') + '</span>' +
+          '</button>';
+      }).join('');
+    }).join('');
+  }
+
+  function showTab(name) {
+    state.tab = name;
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+      t.classList.toggle('active', t.dataset.tab === name);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.pane'), function (p) {
+      p.hidden = p.dataset.pane !== name;
+    });
+  }
+
+  document.querySelector('.tabs').addEventListener('click', function (e) {
+    var tab = e.target.closest('.tab');
+    if (tab) showTab(tab.dataset.tab);
+  });
+
+  /* -------------------------------------------------------------- inspector */
+
+  function fillLinkSelect(select, current) {
+    var groups = {};
+    allLinks().forEach(function (l) {
+      (groups[l.category] = groups[l.category] || []).push(l);
+    });
+
+    select.innerHTML =
+      '<option value=""' + (current ? '' : ' selected') + '>— none, text only —</option>' +
+      Object.keys(groups).map(function (cat) {
+        return '<optgroup label="' + esc(cat) + '">' + groups[cat].map(function (l) {
+          return '<option value="' + esc(l.url) + '"' + (l.url === current ? ' selected' : '') + '>' + esc(l.title) + '</option>';
+        }).join('') + '</optgroup>';
+      }).join('');
+
+    if (current && !allLinks().some(function (l) { return l.url === current; })) {
+      select.insertAdjacentHTML('afterbegin', '<option value="' + esc(current) + '" selected>' + esc(current) + '</option>');
+    }
+  }
+
+  function fillExitSelect(select, dir, cell) {
+    var value = 'auto';
+    if (cell.exits && cell.exits.hasOwnProperty(dir)) value = cell.exits[dir] === null ? 'wall' : cell.exits[dir];
+
+    var options = ['<option value="auto">' + dir + ': auto</option>', '<option value="wall">' + dir + ': wall</option>'];
+    state.maze.cells.forEach(function (c) {
+      if (c.id === cell.id) return;
+      options.push('<option value="' + c.id + '">' + dir + ': → ' + esc(c.id + ' ' + (c.title || linkTitle(c.link))) + '</option>');
+    });
+
+    select.innerHTML = options.join('');
+    select.value = value;
+  }
+
+  /* Weight boxes for the directions this tunnel can actually reach, plus the
+     "back" odds, which apply to whichever direction you happened to enter from. */
+  function fillWeights(cell) {
+    var box = document.getElementById('f-weights');
+    var index = L.indexMaze(state.maze);
+    var conf = cell.tunnel || {};
+    var weights = conf.weights || {};
+
+    var live = L.DIR_NAMES.filter(function (dir) { return !!index.resolveExit(cell, dir); });
+    if (!live.length) {
+      box.innerHTML = '<p class="issue bad">this tunnel has no exits — it leads nowhere</p>';
+      return;
+    }
+
+    var rows = live.map(function (dir) {
+      var w = typeof weights[dir] === 'number' ? weights[dir] : 1;
+      return { key: dir, label: dir, value: w };
+    });
+    rows.push({
+      key: 'back',
+      label: 'back the way you came',
+      value: typeof conf.back === 'number' ? conf.back : 0,
+      back: true
+    });
+
+    var forwardTotal = rows.reduce(function (sum, r) { return r.back ? sum : sum + Math.max(0, r.value); }, 0);
+
+    box.innerHTML = rows.map(function (r) {
+      /* the back odds are a separate draw from the forward split, so showing
+         them as a share of the same pie would be a lie */
+      var odds = r.back
+        ? (r.value > 0 ? 'on' : 'off')
+        : (forwardTotal > 0 ? Math.round((Math.max(0, r.value) / forwardTotal) * 100) + '%' : '—');
+
+      return '<div class="weight-row' + (r.back ? ' is-back' : '') + '">' +
+        '<label>' + esc(r.label) + '</label>' +
+        '<input type="number" min="0" max="100" step="1" data-weight="' + r.key + '" value="' + r.value + '">' +
+        '<span class="odds">' + odds + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function tunnelSeconds(cell) {
+    var conf = cell.tunnel || {};
+    var ms = (conf.ms === undefined ? L.TUNNEL_DEFAULTS.ms : conf.ms) / 1000;
+    var fx = (conf.fx === undefined ? L.TUNNEL_DEFAULTS.fx : conf.fx) / 1000;
+    return { ms: ms, fx: fx, total: fx + ms + fx };
+  }
+
+  /* The transition plays on the way in and again on the way out, so the wait is
+     longer than either number on its own. Spell the sum out. */
+  function showTunnelTotal(cell) {
+    var t = tunnelSeconds(cell);
+    document.getElementById('tunnel-total').textContent =
+      t.fx + ' in + ' + t.ms + ' on screen + ' + t.fx + ' out = ' +
+      Math.round(t.total * 100) / 100 + 's door to door';
+  }
+
+  function showInspector() {
+    var many = state.selection.length > 1;
+    var cell = !many && primaryId() && L.indexMaze(state.maze).byId.get(primaryId());
+
+    document.getElementById('editor').hidden = !cell;
+    document.getElementById('no-selection').hidden = !!cell || many;
+
+    var bulk = document.getElementById('bulk');
+    bulk.hidden = !many;
+    if (many) {
+      document.getElementById('bulk-count').textContent = state.selection.length;
+    }
+    if (!cell) return;
+
+    var tunnel = L.isTunnel(cell);
+    document.getElementById('link-field').hidden = tunnel;
+    document.getElementById('tunnel-fields').hidden = !tunnel;
+
+    if (tunnel) {
+      var conf = cell.tunnel || {};
+      document.getElementById('f-color').value = conf.color || L.TUNNEL_DEFAULTS.color;
+      document.getElementById('f-ms').value =
+        ((conf.ms === undefined ? L.TUNNEL_DEFAULTS.ms : conf.ms) / 1000);
+      document.getElementById('f-fx').value =
+        ((conf.fx === undefined ? L.TUNNEL_DEFAULTS.fx : conf.fx) / 1000);
+
+      var effect = document.getElementById('f-effect');
+      effect.innerHTML = L.EFFECTS.map(function (name) {
+        return '<option value="' + name + '">' + name + (name === 'fade' ? ' (default)' : '') + '</option>';
+      }).join('');
+      effect.value = conf.effect || L.TUNNEL_DEFAULTS.effect;
+
+      showTunnelTotal(cell);
+      fillWeights(cell);
+    } else {
+      fillLinkSelect(document.getElementById('f-link'), cell.link);
+    }
+
+    document.getElementById('f-title').value = cell.title || '';
+    document.getElementById('f-note').value = cell.note || '';
+    DIRS.forEach(function (dir) { fillExitSelect(document.getElementById('f-' + dir), dir, cell); });
+  }
+
+  function currentCell() {
+    return L.indexMaze(state.maze).byId.get(primaryId());
+  }
+
+  function commit() {
+    var cell = currentCell();
+    if (!cell) return;
+
+    if (L.isTunnel(cell)) {
+      var conf = cell.tunnel;
+      conf.color = document.getElementById('f-color').value;
+      conf.ms = Math.max(0, Math.round(Number(document.getElementById('f-ms').value) * 1000) || 0);
+      conf.fx = Math.max(0, Math.round(Number(document.getElementById('f-fx').value) * 1000) || 0);
+      conf.effect = document.getElementById('f-effect').value;
+      showTunnelTotal(cell);
+
+      var weights = {};
+      Array.prototype.forEach.call(document.querySelectorAll('#f-weights [data-weight]'), function (input) {
+        var n = Math.max(0, Number(input.value) || 0);
+        if (input.dataset.weight === 'back') conf.back = n;
+        else weights[input.dataset.weight] = n;
+      });
+      if (Object.keys(weights).length) conf.weights = weights; else delete conf.weights;
+    } else {
+      var url = document.getElementById('f-link').value;
+      if (url) cell.link = url; else delete cell.link;
+    }
+
+    var title = document.getElementById('f-title').value.trim();
+    if (title) cell.title = title; else delete cell.title;
+
+    var note = document.getElementById('f-note').value.trim();
+    if (note) cell.note = note; else delete cell.note;
+
+    var exits = {};
+    DIRS.forEach(function (dir) {
+      var v = document.getElementById('f-' + dir).value;
+      if (v === 'auto') return;
+      exits[dir] = v === 'wall' ? null : v;
+    });
+    if (Object.keys(exits).length) cell.exits = exits; else delete cell.exits;
+
+    draw();
+  }
+
+  /* Rewrites just the percentages, leaving the number inputs alone — rebuilding
+     the rows while someone is typing in one would steal focus mid-keystroke. */
+  function refreshOdds() {
+    var inputs = Array.prototype.slice.call(document.querySelectorAll('#f-weights [data-weight]'));
+    var forward = inputs.filter(function (i) { return i.dataset.weight !== 'back'; });
+    var total = forward.reduce(function (sum, i) { return sum + Math.max(0, Number(i.value) || 0); }, 0);
+
+    inputs.forEach(function (input) {
+      var span = input.parentNode.querySelector('.odds');
+      if (!span) return;
+
+      var value = Math.max(0, Number(input.value) || 0);
+      span.textContent = input.dataset.weight === 'back'
+        ? (value > 0 ? 'on' : 'off')
+        : (total > 0 ? Math.round((value / total) * 100) + '%' : '—');
+    });
+  }
+
+  ['f-link', 'f-title', 'f-note', 'f-color', 'f-ms', 'f-fx', 'f-effect']
+    .concat(DIRS.map(function (d) { return 'f-' + d; }))
+    .forEach(function (id) {
+      var el = document.getElementById(id);
+      el.addEventListener('change', commit);
+      el.addEventListener('input', commit);
+    });
+
+  document.getElementById('f-weights').addEventListener('input', function (e) {
+    if (!e.target.dataset.weight) return;
+    commit();
+    refreshOdds();
+  });
+
+  document.getElementById('make-start').addEventListener('click', function () {
+    if (primaryId()) { state.maze.start = primaryId(); draw(); }
+  });
+
+  function deleteSelected() {
+    if (!state.selection.length) return;
+
+    var gone = state.selection.slice();
+    state.maze.cells = state.maze.cells.filter(function (c) { return gone.indexOf(c.id) === -1; });
+    state.maze.cells.forEach(function (c) {
+      if (!c.exits) return;
+      DIRS.forEach(function (dir) { if (gone.indexOf(c.exits[dir]) !== -1) delete c.exits[dir]; });
+      if (!Object.keys(c.exits).length) delete c.exits;
+    });
+    state.selection = [];
+    showInspector();
+    draw();
+  }
+
+  document.getElementById('delete-cell').addEventListener('click', deleteSelected);
+  document.getElementById('delete-selected').addEventListener('click', deleteSelected);
+
+  document.addEventListener('keydown', function (e) {
+    /* while a test is running the keyboard belongs to the labyrinth, not the
+       editor — otherwise escape and delete would edit the map behind it */
+    if (io.open || testing) return;
+
+    /* backspacing inside the title field must not delete the page */
+    var focused = document.activeElement;
+    if (focused && /^(INPUT|SELECT|TEXTAREA)$/.test(focused.tagName)) return;
+
+    if (e.key === 'Escape' && state.selection.length) {
+      state.selection = [];
+      showInspector();
+      draw();
+      return;
+    }
+
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.selection.length) {
+      e.preventDefault();
+      deleteSelected();
+    }
+  });
+
+  /* ------------------------------------------------------- click and drag */
+
+  var drag = null;
+  var justDragged = false;
+
+  /* Two kinds of drag share this machinery: 'cell' moves a page already on the
+     grid, 'link' brings a card over from the place tab. */
+  grid.addEventListener('pointerdown', function (e) {
+    if (e.button !== 0) return; /* ctrl-click on a mac is a right-click */
+    if (e.target.closest('.cell-edit')) return; /* the edit button is not a handle */
+
+    var cellEl = e.target.closest('.cell');
+    if (!cellEl) return;
+
+    var id = cellEl.dataset.id;
+    var additive = e.metaKey || e.ctrlKey || e.shiftKey;
+
+    /* Grabbing a page that isn't in the selection makes it the selection, so the
+       drag that follows moves what you're actually holding. Grabbing one that is
+       already selected leaves the group intact so it can be moved together. */
+    if (!additive && !isSelected(id)) {
+      selectOnly(id);
+      showInspector();
+      draw();
+    }
+
+    drag = { kind: 'cell', id: id, additive: additive, x: e.clientX, y: e.clientY, moved: false, el: cellEl };
+    cellEl.setPointerCapture(e.pointerId);
+  });
+
+  document.getElementById('deck').addEventListener('pointerdown', function (e) {
+    if (e.button !== 0) return;
+
+    var card = e.target.closest('.link-card');
+    if (!card) return;
+
+    drag = {
+      kind: 'link',
+      url: card.dataset.url,
+      tunnel: !!card.dataset.tunnel,
+      label: card.querySelector('span').textContent,
+      x: e.clientX,
+      y: e.clientY,
+      moved: false,
+      el: card
+    };
+    card.setPointerCapture(e.pointerId);
+  });
+
+  document.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    if (!drag.moved && Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 5) return;
+
+    if (!drag.moved) {
+      drag.moved = true;
+      document.body.classList.add('is-dragging');
+      if (drag.kind === 'cell') {
+        movingIds(drag.id).forEach(function (id) {
+          var el = grid.querySelector('.cell[data-id="' + id + '"]');
+          if (el) el.classList.add('dragging');
+        });
+      } else {
+        showGhost(drag.label);
+      }
+    }
+
+    if (ghost) {
+      ghost.style.left = (e.clientX + 12) + 'px';
+      ghost.style.top = (e.clientY + 12) + 'px';
+    }
+
+    clearDropTargets();
+    previewDrop(e.clientX, e.clientY, drag);
+  });
+
+  document.addEventListener('pointerup', function (e) {
+    if (!drag) return;
+
+    var d = drag;
+    drag = null;
+    hideGhost();
+    clearDropTargets();
+    document.body.classList.remove('is-dragging');
+    clearDragging();
+
+    if (!d.moved) {
+      if (d.kind === 'cell') {
+        if (d.additive) toggleSelected(d.id);
+        else selectOnly(d.id);
+        showInspector();
+        draw();
+      }
+      return;
+    }
+
+    var square = squareUnder(e.clientX, e.clientY);
+    if (square) {
+      if (d.kind === 'cell') {
+        var grabbed = L.indexMaze(state.maze).byId.get(d.id);
+        moveGroup(movingIds(d.id), square.x - grabbed.x, square.y - grabbed.y);
+      } else {
+        var onto = cellAt(square.x, square.y);
+        if (onto) {
+          /* swap the link, keep the square's position, exits and authored flavor.
+             the blank card drops the link entirely, leaving a text-only block;
+             the tunnel card turns the block into a tunnel. */
+          if (d.tunnel) {
+            delete onto.link;
+            if (!onto.tunnel) onto.tunnel = newTunnel();
+          } else {
+            delete onto.tunnel;
+            if (d.url) onto.link = d.url; else delete onto.link;
+          }
+        } else {
+          var made = { id: nextId(), x: square.x, y: square.y };
+          if (d.tunnel) made.tunnel = newTunnel();
+          else if (d.url) made.link = d.url;
+          state.maze.cells.push(made);
+          if (!state.maze.start || state.maze.cells.length === 1) state.maze.start = made.id;
+          selectOnly(made.id);
+          showInspector();
+        }
+      }
+    }
+
+    /* the click that follows this pointerup would otherwise land on the slot we
+       just dropped into and spawn a second page there */
+    justDragged = true;
+    setTimeout(function () { justDragged = false; }, 0);
+    draw();
+  });
+
+  document.addEventListener('pointercancel', function () {
+    drag = null;
+    hideGhost();
+    clearDropTargets();
+    clearDragging();
+    document.body.classList.remove('is-dragging');
+  });
+
+  function clearDropTargets() {
+    Array.prototype.forEach.call(grid.querySelectorAll('.drop-target'), function (s) {
+      s.classList.remove('drop-target');
+    });
+  }
+
+  function clearDragging() {
+    Array.prototype.forEach.call(grid.querySelectorAll('.cell.dragging'), function (c) {
+      c.classList.remove('dragging');
+    });
+  }
+
+  /* Which maze square is the pointer over? Worked out from the grid's geometry
+     rather than from whatever element happens to be under the cursor — when a
+     group moves, the square you're aiming at is usually covered by another
+     member of that same group. */
+  function squareUnder(clientX, clientY) {
+    var view = document.getElementById('canvas').getBoundingClientRect();
+    if (clientX < view.left || clientX > view.right || clientY < view.top || clientY > view.bottom) {
+      return null;
+    }
+
+    var rect = grid.getBoundingClientRect();
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+      return null;
+    }
+
+    return {
+      x: state.origin.x0 + Math.floor((clientX - rect.left) / state.size),
+      y: state.origin.y0 + Math.floor((clientY - rect.top) / state.size)
+    };
+  }
+
+  function elementAtSquare(x, y) {
+    return grid.querySelector('[data-x="' + x + '"][data-y="' + y + '"]');
+  }
+
+  /* dragging any member of the selection drags the whole selection */
+  function movingIds(grabbedId) {
+    return isSelected(grabbedId) ? state.selection.slice() : [grabbedId];
+  }
+
+  /* Moves every id by the same delta, but only if every destination is free.
+     A half-applied group move would silently stack pages on top of each other. */
+  function moveGroup(ids, dx, dy) {
+    if (!dx && !dy) return false;
+
+    var byId = L.indexMaze(state.maze).byId;
+    var moving = ids.map(function (id) { return byId.get(id); }).filter(Boolean);
+
+    var blocked = {};
+    state.maze.cells.forEach(function (c) {
+      if (ids.indexOf(c.id) === -1) blocked[c.x + ',' + c.y] = true;
+    });
+
+    var clear = moving.every(function (c) { return !blocked[(c.x + dx) + ',' + (c.y + dy)]; });
+    if (!clear) return false;
+
+    moving.forEach(function (c) { c.x += dx; c.y += dy; });
+    return true;
+  }
+
+  /* Highlights where the drag would land, and shows nothing when it wouldn't. */
+  function previewDrop(clientX, clientY, d) {
+    var square = squareUnder(clientX, clientY);
+    if (!square) return;
+
+    if (d.kind === 'link') {
+      var el = elementAtSquare(square.x, square.y);
+      if (el) el.classList.add('drop-target');
+      return;
+    }
+
+    var ids = movingIds(d.id);
+    var grabbed = L.indexMaze(state.maze).byId.get(d.id);
+    var dx = square.x - grabbed.x;
+    var dy = square.y - grabbed.y;
+
+    var blocked = {};
+    state.maze.cells.forEach(function (c) {
+      if (ids.indexOf(c.id) === -1) blocked[c.x + ',' + c.y] = true;
+    });
+
+    var byId = L.indexMaze(state.maze).byId;
+    var moving = ids.map(function (id) { return byId.get(id); }).filter(Boolean);
+    if (!moving.every(function (c) { return !blocked[(c.x + dx) + ',' + (c.y + dy)]; })) return;
+
+    moving.forEach(function (c) {
+      var el = elementAtSquare(c.x + dx, c.y + dy);
+      if (el) el.classList.add('drop-target');
+    });
+  }
+
+  var ghost = null;
+
+  function showGhost(label) {
+    ghost = document.createElement('div');
+    ghost.className = 'drag-ghost';
+    ghost.textContent = label;
+    document.body.appendChild(ghost);
+  }
+
+  function hideGhost() {
+    if (ghost) ghost.remove();
+    ghost = null;
+  }
+
+  grid.addEventListener('click', function (e) {
+    var edit = e.target.closest('.cell-edit');
+    if (edit) {
+      selectOnly(edit.dataset.edit);
+      showTab('block');
+      showInspector();
+      draw();
+      return;
+    }
+
+    var slot = e.target.closest('.slot');
+    if (!slot || justDragged) return;
+
+    var links = allLinks();
+    if (!links.length) { alert('no links found in script.js'); return; }
+
+    var placed = new Set(state.maze.cells.map(function (c) { return c.link; }));
+    var pick = links.filter(function (l) { return !placed.has(l.url); })[0] || links[0];
+
+    var cell = { id: nextId(), x: Number(slot.dataset.x), y: Number(slot.dataset.y), link: pick.url };
+    state.maze.cells.push(cell);
+    if (!state.maze.start || state.maze.cells.length === 1) state.maze.start = cell.id;
+
+    selectOnly(cell.id);
+    showInspector();
+    draw();
+  });
+
+  document.getElementById('zoom').addEventListener('input', function (e) {
+    state.size = Number(e.target.value);
+    draw();
+  });
+
+  /* ------------------------------------------------------------ import/export */
+
+  var io = document.getElementById('io');
+  var ioText = document.getElementById('io-text');
+  var ioApply = document.getElementById('io-apply');
+  var ioHint = document.getElementById('io-hint');
+
+  document.getElementById('io-close').addEventListener('click', function () { io.close(); });
+
+  function q(s) { return "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'"; }
+
+  /* The decoy has to look like a real map at a glance: same squares, same shape,
+     links rotated and exits shuffled. */
+  function decoyOf(maze) {
+    /* text-only pages have no link to rotate, so draw the decoy's links from the
+       ones that do exist — otherwise the decoy serialises a literal "undefined" */
+    var urls = maze.cells.map(function (c) { return c.link; }).filter(Boolean);
+    if (!urls.length) urls = allLinks().map(function (l) { return l.url; });
+
+    var cells = maze.cells.map(function (c, i) {
+      var cell = { id: c.id, x: c.x, y: c.y };
+
+      /* keep tunnels tunnels, or the decoy stops resembling the real map */
+      if (L.isTunnel(c)) {
+        cell.tunnel = {
+          color: c.tunnel.color || L.TUNNEL_DEFAULTS.color,
+          ms: (i % 3 + 2) * 250,
+          fx: (i % 4 + 1) * 150,
+          effect: L.EFFECTS[i % L.EFFECTS.length],
+          back: (i % 4) * 10
+        };
+      } else if (urls.length) {
+        cell.link = urls[(i * 7 + 3) % urls.length];
+      }
+      return cell;
+    });
+    var real = maze.cells.filter(function (c) { return c.exits; }).length || 3;
+    for (var n = 0; n < real && cells.length > 4; n++) {
+      var at = cells[(n * 5 + 4) % cells.length];
+      var dir = DIRS[n % 4];
+      at.exits = {};
+      at.exits[dir] = n % 3 === 1 ? null : cells[(n * 11 + 2) % cells.length].id;
+    }
+    return { start: cells.length ? cells[Math.floor(cells.length / 2)].id : 'c0', cells: cells };
+  }
+
+  function mapCode() {
+    var decoy = decoyOf(state.maze);
+
+    var decoyJs = '  var labyrinth = {\n    start: ' + q(decoy.start) + ',\n    cells: [\n' +
+      decoy.cells.map(function (c) {
+        var parts = ['id: ' + q(c.id), 'x: ' + c.x, 'y: ' + c.y];
+        if (c.link) parts.push('link: ' + q(c.link));
+        if (c.tunnel) {
+          parts.push('tunnel: { color: ' + q(c.tunnel.color) + ', ms: ' + c.tunnel.ms +
+            ', fx: ' + c.tunnel.fx + ', effect: ' + q(c.tunnel.effect) +
+            ', back: ' + c.tunnel.back + ' }');
+        }
+        if (c.exits) {
+          parts.push('exits: { ' + Object.keys(c.exits).map(function (k) {
+            return k + ': ' + (c.exits[k] === null ? 'null' : q(c.exits[k]));
+          }).join(', ') + ' }');
+        }
+        return '      { ' + parts.join(', ') + ' }';
+      }).join(',\n') + '\n    ]\n  };';
+
+    var blob = L.encodeMaze(state.maze).match(/.{1,84}/g).map(q).join(' +\n    ');
+
+    return decoyJs +
+      '\n\n  /* Prebuilt cache of the map above. Falls back to it if anything goes wrong. */\n' +
+      '  var LABYRINTH_CACHE =\n    ' + blob + ';';
+  }
+
+  /* ------------------------------------------------------------------ test */
+
+  /* The site's stylesheet is only pulled in while a test is running. It defines
+     body and .link-card rules of its own, which would fight the editor's — but
+     the overlay covers the whole window, so nothing underneath is visible, and
+     the link goes away again on exit. */
+  var siteStyles = null;
+  var testing = false;
+
+  function withSiteStyles(then) {
+    if (siteStyles) { then(); return; }
+
+    siteStyles = document.createElement('link');
+    siteStyles.rel = 'stylesheet';
+    siteStyles.href = '../styles.css';
+
+    var go = function () { then(); };
+    siteStyles.addEventListener('load', go);
+    siteStyles.addEventListener('error', go); /* unstyled is better than nothing */
+    setTimeout(go, 1200);                     /* and never hang on it */
+
+    document.head.appendChild(siteStyles);
+  }
+
+  function startTest() {
+    if (testing) return;
+    if (!state.maze.cells.length) { alert('nothing to test yet'); return; }
+
+    var index = L.indexMaze(state.maze);
+    var selected = primaryId() && index.byId.get(primaryId());
+
+    /* Starting on a tunnel would route straight through it without ever playing
+       its effect, which is the opposite of useful when you're testing one. */
+    var from = selected && !L.isTunnel(selected) ? selected.id : state.maze.start;
+    if (!index.byId.get(from)) { alert('set a start block first'); return; }
+
+    var called = false;
+    withSiteStyles(function () {
+      if (called) return;
+      called = true;
+
+      testing = true;
+      L.preview(state.maze, from, function () {
+        testing = false;
+        if (siteStyles) { siteStyles.remove(); siteStyles = null; }
+        draw();
+      });
+    });
+  }
+
+  document.getElementById('test').addEventListener('click', startTest);
+
+  document.getElementById('export').addEventListener('click', function () {
+    var text = mapCode();
+    ioText.value = text;
+    ioApply.hidden = true;
+    ioHint.textContent = 'paste this into labyrinth.js, replacing everything between the two "generated map" comments.';
+    io.showModal();
+    ioText.select();
+    try { navigator.clipboard.writeText(text); } catch (err) { /* user can copy by hand */ }
+  });
+
+  document.getElementById('import').addEventListener('click', function () {
+    ioText.value = '';
+    ioApply.hidden = false;
+    ioHint.textContent = 'paste generated map code (or raw JSON) here.';
+    io.showModal();
+  });
+
+  ioApply.addEventListener('click', function () {
+    var text = ioText.value.trim();
+    var maze = null;
+
+    var cache = text.match(/LABYRINTH_CACHE\s*=([\s\S]*?);/);
+    if (cache) {
+      var blob = (cache[1].match(/'([^']*)'/g) || []).map(function (s) { return s.slice(1, -1); }).join('');
+      try { maze = L.decodeMaze(blob); } catch (err) { maze = null; }
+    }
+    if (!maze) { try { maze = JSON.parse(text); } catch (err) { maze = null; } }
+
+    if (!maze || !maze.cells) { ioHint.textContent = "couldn't read a map out of that."; return; }
+
+    state.maze = maze;
+    state.selection = [];
+    showInspector();
+    draw();
+    io.close();
+  });
+
+  document.getElementById('load-live').addEventListener('click', function () {
+    if (!confirm('replace the draft with the map currently in labyrinth.js?')) return;
+    state.maze = L.loadMaze();
+    state.selection = [];
+    showInspector();
+    draw();
+  });
+
+  /* ------------------------------------------------------------------ start */
+
+  state.maze = load() || L.loadMaze();
+  showInspector();
+  draw();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# GitHub Pages build settings.
+#
+# Anything listed here is NOT copied to the published site. Files and folders
+# whose names start with an underscore are already skipped by default; listing
+# _tools explicitly makes the intent obvious and survives someone later adding
+# a .nojekyll file.
+exclude:
+  - _tools
+  - CLAUDE.md
+  - .claude
+  - .vscode
