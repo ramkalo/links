@@ -88,6 +88,18 @@ maze.cells.forEach(cell => {
   }
 });
 
+/* Colours and fonts, from the same function the editor's theme tab uses. Mostly
+   this catches a palette where something has become unreadable against the
+   background it sits on. */
+L.themeProblems(maze.theme).forEach(([severity, text]) => {
+  (severity === 'bad' ? problems : notes).push(text);
+});
+
+/* The backpack — dead item actions, duplicate ids, and so on. */
+L.itemProblems(maze, index).forEach(([severity, text]) => {
+  (severity === 'bad' ? problems : notes).push(text);
+});
+
 if (L.isTunnel(index.byId.get(maze.start) || {})) {
   problems.push(`the start block ${maze.start} is a tunnel — visitors would arrive mid-transition`);
 }
@@ -106,8 +118,12 @@ const tunnels = maze.cells.filter(c => L.isTunnel(c)).length;
 const blanks = maze.cells.filter(c => !c.link && !L.isTunnel(c) && !L.hasLayout(c)).length;
 const laidOut = maze.cells.filter(c => L.hasLayout(c)).length;
 
+const items = L.mazeItems(maze);
+const startItems = items.filter(it => it.start).length;
+
 console.log(`${maze.cells.length} blocks, ${live.size} reachable, ${tunnels} tunnels, ${wormholes} wormholes, ${walls} walls, ${blanks} text-only, ${laidOut} arranged`);
 console.log(`${linkUrls.size} links, ${[...linkUrls].filter(u => placed.has(u)).length} of them placed`);
+console.log(`${items.length} items, ${startItems} in the pack from the start${maze.items ? '' : ' (default set)'}`);
 notes.forEach(n => console.log('  note: ' + n));
 problems.forEach(p => console.log('  PROBLEM: ' + p));
 

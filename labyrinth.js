@@ -29,10 +29,289 @@
   var EL_TYPES = ['title', 'line', 'para', 'image', 'button'];
   var EL_LIMITS = { title: 10, line: 10, para: 10, image: 10, button: 10 };
   var EL_DEFAULTS = { size: 3, align: 'center', valign: 'middle', fit: 'contain' };
-  var BUTTON_ACTIONS = ['url', 'goto', 'random'];
+  /* a button either opens a url, jumps you around the maze, or hands you an item */
+  var BUTTON_ACTIONS = ['url', 'goto', 'random', 'additem'];
 
   function hasLayout(cell) {
     return !!(cell && cell.layout && cell.layout.length);
+  }
+
+  /* --------------------------------------------------------------- the pack */
+
+  /* The backpack's contents live in the map now, the way links and blocks do.
+     An item is text — a name and a line of flavor — with an optional action when
+     you tap it: 'goto' a block, 'start' back to the beginning (what the escape
+     rope does), 'random' anywhere, or 'none', which just shows the flavor.
+     `start: true` means it's in the pack from the first screen; everything else
+     is granted by an "add item" button somewhere in the maze. Items are never
+     used up — tapping one is repeatable. */
+  var ITEM_ACTIONS = ['none', 'goto', 'start', 'random'];
+  var ITEM_DEFAULTS = { action: 'none', start: false };
+
+  /* What a map with no items of its own gets — the original hardcoded pack, now
+     text-only and editable. A map that leaves these untouched carries no items
+     array at all, exactly like the theme. */
+  var DEFAULT_ITEMS = [
+    { id: 'rope', name: 'escape rope', flavor: 'you climb. you arrive back at the beginning.', action: 'start', start: true },
+    { id: 'key', name: 'bent key', flavor: "it doesn't fit anything here.", start: true },
+    { id: 'battery', name: 'dead battery', flavor: 'no charge. you keep it anyway.', start: true },
+    { id: 'map', name: 'half a map', flavor: 'the useful half is missing.', start: true },
+    { id: 'receipt', name: 'a receipt', flavor: 'for something you do not remember buying.', start: true }
+  ];
+
+  function mazeItems(maze) {
+    return (maze && maze.items) || DEFAULT_ITEMS;
+  }
+
+  function itemById(maze, id) {
+    return mazeItems(maze).filter(function (it) { return it.id === id; })[0] || null;
+  }
+
+  /* An item with a `room` only does its thing while the visitor is standing in
+     that block — a key that turns nothing until you're at the right door. With
+     no `room` it works anywhere. Exported so the site and the tests judge it the
+     same way. */
+  function itemUsableIn(item, cellId) {
+    return !item || !item.room || item.room === cellId;
+  }
+
+  /* ------------------------------------------------------------------ theme */
+
+  /* The map carries its own look. Every value here is the current hardcoded one,
+     so a map with no theme renders exactly as it did before this existed.
+
+     Colours are named by the job they do, not by where they came from — `title`
+     happens to be the old nord green, but what it means is "the colour titles
+     and highlights are". Tunnels are deliberately absent: a tunnel sets its own
+     background and always has. */
+  var THEME_DEFAULTS = {
+    bg: '#2E3440',
+    title: '#7ECF4E',
+    text: '#ECEFF4',
+    muted: '#D8DEE9',
+    link: '#4D9ED8',
+    accent: '#4ECFCD',
+    arrow: '#4ECFCD',
+    border: '#434C5E',
+    titleFont: 'runic',
+    lineFont: 'mono',
+    paraFont: 'mono',
+    /* a multiplier on the base arrow size, not an absolute — 1.5 is the size
+       everything ships at, so untouched maps get the bigger arrows for free */
+    arrowScale: 1.5,
+    /* the backpack has its own colour, font and size, and can be switched off
+       entirely (there's then no reset unless a block hands the way back). */
+    packColor: '#D8DEE9',
+    packFont: 'mono',
+    packScale: 1,
+    pack: true
+  };
+
+  /* `google` entries are fetched on demand by ensureFonts(); the rest are either
+     already in styles.css or come from the machine, and cost nothing. */
+  var FONTS = [
+    { id: 'runic', label: 'neo greek runic', stack: "'NeoGreekRunic', monospace" },
+    /* local display faces in fonts/, each with an @font-face in styles.css */
+    { id: 'regulon', label: 'regulon 18', stack: "'Regulon18', sans-serif" },
+    { id: 'amazingdigital', label: 'amazing digital', stack: "'AmazingDigital', monospace" },
+    { id: 'quadramatic', label: 'quadramatic', stack: "'Quadramatic', sans-serif" },
+    { id: 'splitbits', label: 'split bits', stack: "'SplitBits', monospace" },
+    { id: 'mono', label: 'jetbrains mono', stack: "'JetBrains Mono', Monaco, monospace" },
+    { id: 'sans', label: 'system sans', stack: "system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif" },
+    { id: 'serif', label: 'system serif', stack: "Georgia, 'Times New Roman', serif" },
+    { id: 'courier', label: 'typewriter', stack: "'Courier New', Courier, monospace" },
+    { id: 'space', label: 'space mono', stack: "'Space Mono', monospace", google: 'Space+Mono:ital,wght@0,400;0,700;1,400' },
+    { id: 'plex', label: 'ibm plex mono', stack: "'IBM Plex Mono', monospace", google: 'IBM+Plex+Mono:ital,wght@0,400;0,600;1,400' },
+    { id: 'syne', label: 'syne mono', stack: "'Syne Mono', monospace", google: 'Syne+Mono' },
+    { id: 'bebas', label: 'bebas neue', stack: "'Bebas Neue', Impact, sans-serif", google: 'Bebas+Neue' },
+    { id: 'elite', label: 'special elite', stack: "'Special Elite', 'Courier New', cursive", google: 'Special+Elite' },
+    { id: 'unifraktur', label: 'unifraktur maguntia', stack: "'UnifrakturMaguntia', cursive", google: 'UnifrakturMaguntia' }
+  ];
+
+  var THEME_COLORS = ['bg', 'title', 'text', 'muted', 'link', 'accent', 'arrow', 'border', 'packColor'];
+  var THEME_FONTS = ['titleFont', 'lineFont', 'paraFont', 'packFont'];
+  var THEME_NUMBERS = ['arrowScale', 'packScale'];
+  var THEME_BOOLS = ['pack'];
+
+  function themeSetting(theme, key) {
+    var v = (theme || {})[key];
+    return v === undefined || v === null || v === '' ? THEME_DEFAULTS[key] : v;
+  }
+
+  function fontById(id) {
+    return FONTS.filter(function (f) { return f.id === id; })[0] || FONTS[0];
+  }
+
+  function parseHex(color) {
+    var hex = String(color || '').replace('#', '');
+    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+
+    return [
+      parseInt(hex.slice(0, 2), 16),
+      parseInt(hex.slice(2, 4), 16),
+      parseInt(hex.slice(4, 6), 16)
+    ];
+  }
+
+  /* Panels — the backpack, the inventory — sit just off the background rather
+     than having a colour of their own, so there is one background to choose
+     instead of two that have to be kept looking related. */
+  function lift(color, amount) {
+    var rgb = parseHex(color);
+    if (!rgb) return color;
+
+    var up = isLight(color) ? -amount : amount;
+    return '#' + rgb.map(function (v) {
+      var n = Math.max(0, Math.min(255, v + up));
+      return (n < 16 ? '0' : '') + n.toString(16);
+    }).join('');
+  }
+
+  /* Google's stylesheet is only fetched for a font actually in use, and only
+     once — a theme using none of them makes no third-party request at all. */
+  function ensureFonts(theme, doc) {
+    var d = doc || (typeof document !== 'undefined' ? document : null);
+    if (!d || !d.head) return;
+
+    THEME_FONTS.forEach(function (key) {
+      var font = fontById(themeSetting(theme, key));
+      if (!font.google) return;
+
+      var id = 'lab-font-' + font.id;
+      if (d.getElementById(id)) return;
+
+      var link = d.createElement('link');
+      link.id = id;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=' + font.google + '&display=swap';
+      d.head.appendChild(link);
+    });
+  }
+
+  /* Paints a theme onto one element by overriding the variables every .lab-*
+     rule already reads. Scoped rather than global on purpose: the editor puts it
+     on its layout stage, and its own chrome keeps the :root values. */
+  function applyTheme(theme, el) {
+    if (!el || !el.style) return;
+
+    var bg = themeSetting(theme, 'bg');
+
+    el.style.setProperty('--card-bg', bg);
+    el.style.setProperty('--bg', lift(bg, 13));
+    el.style.setProperty('--card-border', themeSetting(theme, 'border'));
+    el.style.setProperty('--text', themeSetting(theme, 'text'));
+    el.style.setProperty('--text-muted', themeSetting(theme, 'muted'));
+    el.style.setProperty('--green', themeSetting(theme, 'title'));
+    el.style.setProperty('--teal', themeSetting(theme, 'accent'));
+    el.style.setProperty('--blue-mid', themeSetting(theme, 'link'));
+
+    /* arrows are their own colour and their own size now, both split off from
+       the button accent that used to cover them */
+    el.style.setProperty('--lab-arrow', themeSetting(theme, 'arrow'));
+    el.style.setProperty('--lab-arrow-scale', String(themeSetting(theme, 'arrowScale')));
+
+    /* the backpack's colour, font and size — its own set, since it's chrome that
+       sits over every block rather than part of any one of them */
+    el.style.setProperty('--lab-pack', themeSetting(theme, 'packColor'));
+    el.style.setProperty('--lab-pack-font', fontById(themeSetting(theme, 'packFont')).stack);
+    el.style.setProperty('--lab-pack-scale', String(themeSetting(theme, 'packScale')));
+
+    el.style.setProperty('--lab-font-title', fontById(themeSetting(theme, 'titleFont')).stack);
+    el.style.setProperty('--lab-font-line', fontById(themeSetting(theme, 'lineFont')).stack);
+    el.style.setProperty('--lab-font-para', fontById(themeSetting(theme, 'paraFont')).stack);
+
+    ensureFonts(theme, el.ownerDocument);
+  }
+
+  /* --------------------------------------------------- theme legibility */
+
+  function channelLuminance(v) {
+    var c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+
+  function relativeLuminance(color) {
+    var rgb = parseHex(color);
+    if (!rgb) return null;
+
+    return 0.2126 * channelLuminance(rgb[0]) +
+           0.7152 * channelLuminance(rgb[1]) +
+           0.0722 * channelLuminance(rgb[2]);
+  }
+
+  function contrastRatio(a, b) {
+    var la = relativeLuminance(a);
+    var lb = relativeLuminance(b);
+    if (la === null || lb === null) return null;
+
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+
+  /* The one way a theme can actually break the site is by making something the
+     same colour as what's behind it.
+
+     WCAG's comfortable targets are 4.5:1 for body text and 3:1 for large text.
+     These warn a little below that — the default palette's link blue sits at
+     4.3:1, and a checker that cries wolf about the shipped defaults is a checker
+     nobody reads. What's left still catches anything genuinely unreadable. */
+  var CONTRAST_NEEDS = [
+    ['text', 'strong text', 4],
+    ['muted', 'paragraphs and single lines', 4],
+    ['link', 'links inside paragraphs', 4],
+    ['title', 'titles', 3],
+    ['accent', 'buttons', 3],
+    ['arrow', 'the direction arrows', 3],
+    ['packColor', 'the backpack', 3]
+  ];
+
+  function themeProblems(theme) {
+    var out = [];
+    var bg = themeSetting(theme, 'bg');
+
+    THEME_COLORS.forEach(function (key) {
+      if (!parseHex(themeSetting(theme, key))) {
+        out.push(['bad', 'theme: ' + key + ' is not a colour']);
+      }
+    });
+
+    THEME_FONTS.forEach(function (key) {
+      var id = themeSetting(theme, key);
+      if (!FONTS.some(function (f) { return f.id === id; })) {
+        out.push(['bad', 'theme: ' + key + ' is set to a font that does not exist (' + id + ')']);
+      }
+    });
+
+    var scaleNames = { arrowScale: 'arrow size', packScale: 'backpack size' };
+    THEME_NUMBERS.forEach(function (key) {
+      var n = themeSetting(theme, key);
+      if (typeof n !== 'number' || !isFinite(n) || n <= 0) {
+        out.push(['bad', 'theme: ' + (scaleNames[key] || key) + ' must be a positive number']);
+      }
+    });
+
+    THEME_BOOLS.forEach(function (key) {
+      var v = (theme || {})[key];
+      if (v !== undefined && typeof v !== 'boolean') {
+        out.push(['bad', 'theme: ' + key + ' must be on or off']);
+      }
+    });
+
+    if (!parseHex(bg)) return out;
+
+    CONTRAST_NEEDS.forEach(function (need) {
+      /* a switched-off backpack can't be unreadable — it isn't shown */
+      if (need[0] === 'packColor' && themeSetting(theme, 'pack') === false) return;
+
+      var ratio = contrastRatio(themeSetting(theme, need[0]), bg);
+      if (ratio === null || ratio >= need[2]) return;
+
+      out.push(['warn', 'theme: ' + need[1] + ' only reach ' +
+        (Math.round(ratio * 10) / 10) + ':1 against the background, under the ' +
+        need[2] + ':1 they need to stay readable']);
+    });
+
+    return out;
   }
 
   /* Quotes too, not just angle brackets: this also guards the href="" a block's
@@ -168,6 +447,10 @@
       } else if (action === 'url') {
         if (!el.to) out.push(['warn', where + ' is a link button with no link on it']);
         else if (!safeUrl(el.to)) out.push(['bad', where + ' has a destination that will be refused: ' + el.to]);
+      } else if (action === 'additem') {
+        /* a button that hands out an item the map doesn't define does nothing */
+        if (!el.to) out.push(['warn', where + ' adds an item but none is chosen']);
+        else if (!itemById(index.maze, el.to)) out.push(['bad', where + ' adds an item that does not exist: ' + el.to]);
       }
     });
 
@@ -175,6 +458,44 @@
       var cap = EL_LIMITS[type];
       if (cap !== undefined && counts[type] > cap) {
         out.push(['bad', cell.id + ' has ' + counts[type] + ' ' + type + ' elements, more than the ' + cap + ' allowed']);
+      }
+    });
+
+    return out;
+  }
+
+  /* Everything that can be wrong with the pack, as [severity, text] pairs — the
+     same shape as layoutProblems and themeProblems, and checked by the editor
+     and maze-check from this one copy. */
+  function itemProblems(maze, index) {
+    var out = [];
+    var items = mazeItems(maze);
+    var seen = {};
+
+    items.forEach(function (it, i) {
+      var where = 'item ' + (i + 1) + (it.name ? ' (' + it.name + ')' : '');
+
+      if (!it.id) out.push(['bad', where + ' has no id']);
+      else if (seen[it.id]) out.push(['bad', 'two items share the id ' + it.id + ' — add-item buttons can’t tell them apart']);
+      else seen[it.id] = true;
+
+      if (!String(it.name || '').trim()) out.push(['warn', where + ' has no name']);
+
+      var action = it.action || 'none';
+      if (ITEM_ACTIONS.indexOf(action) === -1) {
+        out.push(['bad', where + ' has an action that does not exist']);
+      } else if (action === 'goto') {
+        if (!it.to) out.push(['bad', where + ' goes to a block but none is chosen']);
+        else if (index && !index.byId.get(it.to)) out.push(['bad', where + ' goes to ' + it.to + ', which no longer exists']);
+        else if (index && isTunnel(index.byId.get(it.to))) out.push(['warn', where + ' goes to ' + it.to + ', a tunnel — the visitor gets routed straight through it']);
+      }
+
+      /* a room limit only means anything if the block exists, the item does
+         something, and the visitor can actually stop in that block */
+      if (it.room) {
+        if (index && !index.byId.get(it.room)) out.push(['bad', where + ' only works in ' + it.room + ', which is not a block']);
+        else if (index && isTunnel(index.byId.get(it.room))) out.push(['warn', where + ' only works in ' + it.room + ', a tunnel — the visitor never stops there, so it never works']);
+        else if (action === 'none') out.push(['warn', where + ' is limited to a room but does nothing, so the limit has no effect']);
       }
     });
 
@@ -400,30 +721,23 @@
     };
   }
 
-  /* ---------------------------------------------------------------- the pack */
-
-  var ITEMS = [
-    { icon: '🪢', name: 'escape rope', escape: true, flavor: 'you climb. you arrive back at the beginning.' },
-    { icon: '🗝', name: 'bent key', flavor: "it doesn't fit anything here." },
-    { icon: '🔋', name: 'dead battery', flavor: 'no charge. you keep it anyway.' },
-    { icon: '🗺', name: 'half a map', flavor: 'the useful half is missing.' },
-    { icon: '🧾', name: 'a receipt', flavor: 'for something you do not remember buying.' }
-  ];
-
   /* ------------------------------------------------------------------ state */
 
   var STORAGE_KEY = 'labyrinth-cell';
+  var ITEMS_KEY = 'labyrinth-items';
   var SWIPE_THRESHOLD = 50;
 
   var index = null;
   var links = null;
   var current = null;
+  var held = null;         /* the ids of items currently in the pack */
   var active = false;
   var moving = false;
   var previewing = false;  /* running inside the editor's test button */
   var onPreviewExit = null;
+  var toastTimer = null;
 
-  var root, stage, veil, pack, inventory, flavorLine, lightbox;
+  var root, stage, veil, pack, inventory, flavorLine, lightbox, toast;
 
   /* ------------------------------------------------------------- rendering */
 
@@ -486,8 +800,9 @@
       '" target="_blank" rel="noopener noreferrer">' + inner + '</a>';
   }
 
-  /* A url button is a real anchor so it behaves like one; the two that move you
-     around the maze are buttons the stage's click handler picks up. */
+  /* A url button is a real anchor so it behaves like one; the rest are buttons
+     the stage's click handler picks up — moving you around the maze, or dropping
+     an item into the pack. */
   function buttonBody(el) {
     var label = '<span class="lab-btn-label">' + escapeHtml(el.text || '') + '</span>';
 
@@ -496,6 +811,9 @@
     }
     if (el.action === 'random') {
       return '<button class="lab-btn" data-random="1">' + label + '</button>';
+    }
+    if (el.action === 'additem') {
+      return '<button class="lab-btn" data-additem="' + escapeHtml(el.to || '') + '">' + label + '</button>';
     }
 
     var href = safeUrl(el.to);
@@ -798,17 +1116,27 @@
 
   /* --------------------------------------------------------------- the pack */
 
+  /* The items currently in the pack, in the order the map lists them. */
+  function heldItems() {
+    var have = held || [];
+    return mazeItems(index.maze).filter(function (it) {
+      return have.indexOf(it.id) !== -1;
+    });
+  }
+
+  /* Text, not icons — a name and, when you tap it, its line of flavor. */
   function buildInventory() {
-    var slots = ITEMS.map(function (item, i) {
-      return '<li><button class="lab-slot" data-item="' + i + '">' +
-        '<span class="lab-slot-icon">' + item.icon + '</span>' +
-        '<span class="lab-slot-name">' + escapeHtml(item.name) + '</span>' +
-        '</button></li>';
-    }).join('');
+    var have = heldItems();
+
+    var body = have.length
+      ? '<ul class="lab-slots">' + have.map(function (item) {
+          return '<li><button class="lab-slot" data-item="' + escapeHtml(item.id) + '">' +
+            escapeHtml(item.name || item.id) + '</button></li>';
+        }).join('') + '</ul>'
+      : '<p class="lab-empty">your pack is empty.</p>';
 
     inventory.innerHTML =
-      '<h2 class="lab-inv-title">inventory</h2>' +
-      '<ul class="lab-slots">' + slots + '</ul>' +
+      '<h2 class="lab-inv-title">backpack</h2>' + body +
       '<p class="lab-flavor" id="lab-flavor"></p>';
 
     flavorLine = inventory.querySelector('#lab-flavor');
@@ -816,26 +1144,85 @@
 
   function toggleInventory(open) {
     var show = open === undefined ? inventory.hidden : open;
+    if (show) buildInventory(); /* reflect anything picked up since it last opened */
     inventory.hidden = !show;
     pack.setAttribute('aria-expanded', String(show));
     if (!show && flavorLine) flavorLine.textContent = '';
   }
 
-  /* The rope is the only item that does anything. On the site it hauls you back
-     to the start block — the labyrinth is the whole site now, so there is nowhere
-     else to be let out to. Inside the editor's test run it does let you out,
-     because there the way out is back to the editor. */
-  function useItem(i) {
-    var item = ITEMS[i];
+  /* Tapping an item runs its action, if it has one and this is a room it's
+     allowed to work in, and shows its flavor either way. 'start' is what the
+     escape rope does — back to the beginning, or out to the editor during a test
+     run. Nothing is ever consumed; you can tap again. */
+  function useItem(id) {
+    var item = itemById(index.maze, id);
     if (!item) return;
 
-    if (item.escape && previewing) {
-      exitLabyrinth();
-      return;
-    }
-    if (item.escape) returnToStart();
+    var action = item.action || 'none';
 
-    flavorLine.textContent = item.flavor;
+    if (itemUsableIn(item, current && current.id)) {
+      if (action === 'start') {
+        if (previewing) { exitLabyrinth(); return; }
+        returnToStart();
+      } else if (action === 'goto') {
+        jumpTo(item.to);
+      } else if (action === 'random') {
+        jumpAnywhere();
+      }
+    }
+
+    /* the flavor shows whether or not it worked — in a room where it does
+       nothing, that line is the only thing the author gets to say */
+    if (flavorLine) flavorLine.textContent = item.flavor || '';
+  }
+
+  /* Which items a visitor holds when they arrive — the ones flagged `start`. */
+  function startingHeld() {
+    return mazeItems(index.maze)
+      .filter(function (it) { return it.start; })
+      .map(function (it) { return it.id; });
+  }
+
+  function loadHeld() {
+    var saved = null;
+    if (!previewing) {
+      try { saved = JSON.parse(sessionStorage.getItem(ITEMS_KEY) || 'null'); } catch (err) { /* private mode */ }
+    }
+    var list = Array.isArray(saved) ? saved : startingHeld();
+
+    /* drop anything the map no longer defines — an item can be removed between
+       one visit and the next */
+    held = list.filter(function (id) { return itemById(index.maze, id); });
+  }
+
+  function rememberHeld() {
+    if (previewing) return;
+    try { sessionStorage.setItem(ITEMS_KEY, JSON.stringify(held)); } catch (err) { /* private mode */ }
+  }
+
+  /* An add-item button hands the visitor an item. Idempotent — pressing it twice
+     doesn't stack, it just tells you it's already yours. */
+  function addItem(id) {
+    var item = itemById(index.maze, id);
+    if (!item) return;
+
+    held = held || [];
+    if (held.indexOf(id) === -1) {
+      held.push(id);
+      rememberHeld();
+      if (!inventory.hidden) buildInventory();
+      showToast('picked up: ' + (item.name || 'something'));
+    } else {
+      showToast('already in your pack: ' + (item.name || 'that'));
+    }
+  }
+
+  function showToast(text) {
+    if (!toast) return;
+    toast.textContent = text;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.hidden = true; }, 1800);
   }
 
   /* ------------------------------------------------------------- enter/exit */
@@ -861,6 +1248,17 @@
     /* read the links now rather than at startup: map.js and this file are both
        injected dynamically, so the map may not have existed yet when init() ran */
     links = buildLinkIndex(index.maze);
+
+    /* The map brings its own colours and fonts. Applied here rather than at
+       startup for the same reason, and applied to the container rather than
+       :root so the editor's own chrome is left alone. */
+    applyTheme(index.maze.theme, root);
+    if (!previewing) document.body.style.background = themeSetting(index.maze.theme, 'bg');
+
+    /* the pack the visitor arrives with, resumed from this session if there is one */
+    loadHeld();
+    /* hidden when the theme switches it off, or when there are no items to hold */
+    pack.hidden = themeSetting(index.maze.theme, 'pack') === false || !mazeItems(index.maze).length;
 
     active = true;
     root.hidden = false;
@@ -984,6 +1382,7 @@
 
       if (button.dataset.random) jumpAnywhere();
       else if (button.dataset.goto) jumpTo(button.dataset.goto);
+      else if (button.hasAttribute('data-additem')) addItem(button.dataset.additem);
     });
   }
 
@@ -1020,14 +1419,16 @@
     root.innerHTML =
       '<div class="lab-stage" id="lab-stage"></div>' +
       '<div class="lab-veil" id="lab-veil"></div>' +
-      '<button class="lab-pack" id="lab-pack" aria-expanded="false" aria-label="backpack">🎒</button>' +
+      '<button class="lab-pack" id="lab-pack" aria-expanded="false">backpack</button>' +
       '<div class="lab-inventory" id="lab-inventory" hidden></div>' +
+      '<div class="lab-toast" id="lab-toast" hidden></div>' +
       '<div class="lab-lightbox" id="lab-lightbox" hidden></div>';
 
     stage = root.querySelector('#lab-stage');
     veil = root.querySelector('#lab-veil');
     pack = root.querySelector('#lab-pack');
     inventory = root.querySelector('#lab-inventory');
+    toast = root.querySelector('#lab-toast');
     lightbox = root.querySelector('#lab-lightbox');
 
     buildInventory();
@@ -1041,7 +1442,7 @@
 
     inventory.addEventListener('click', function (e) {
       var slot = e.target.closest('.lab-slot');
-      if (slot) useItem(Number(slot.dataset.item));
+      if (slot) useItem(slot.dataset.item);
     });
 
     if (previewHost) return;
@@ -1072,6 +1473,24 @@
     pickExit: pickExit,
     hasLayout: hasLayout,
     layoutProblems: layoutProblems,
+    itemProblems: itemProblems,
+    mazeItems: mazeItems,
+    itemById: itemById,
+    itemUsableIn: itemUsableIn,
+    DEFAULT_ITEMS: DEFAULT_ITEMS,
+    ITEM_ACTIONS: ITEM_ACTIONS,
+    ITEM_DEFAULTS: ITEM_DEFAULTS,
+    themeProblems: themeProblems,
+    applyTheme: applyTheme,
+    ensureFonts: ensureFonts,
+    contrastRatio: contrastRatio,
+    CONTRAST_NEEDS: CONTRAST_NEEDS,
+    THEME_DEFAULTS: THEME_DEFAULTS,
+    THEME_COLORS: THEME_COLORS,
+    THEME_FONTS: THEME_FONTS,
+    THEME_NUMBERS: THEME_NUMBERS,
+    THEME_BOOLS: THEME_BOOLS,
+    FONTS: FONTS,
     renderMarkup: renderMarkup,
     markupUrls: markupUrls,
     cellUrls: cellUrls,

@@ -22,7 +22,7 @@ and saving the exported file over `map.js`.
 
 A deliberately hostile way to browse a pile of links. One link per full screen; swipe or arrow-key
 to move. It opens on load and there is no way out — the escape rope in the backpack drops you back
-at the start block rather than leaving.
+at the start block rather than leaving (unless the author deletes it; see The pack).
 
 **Vocabulary — use these words, they're the user's:** a **block** is one square of the maze (one
 full screen); the **map** is all the blocks plus the start; **map code** is the generated JavaScript
@@ -39,6 +39,64 @@ flat string, used only to group the editor's deck). Cells reference a link **by 
 them. A cell with **no `link` at all** is a text-only block — it renders as a `div.lab-text` instead
 of an anchor, so there's nothing to click.
 
+## The pack
+
+The backpack's contents live in the map as an optional `items` array — text, not icons. An item is
+`{ id, name, flavor, action, to, room, start }`: `flavor` is the line shown when it's tapped,
+`action` is one of `ITEM_ACTIONS` (`none` / `goto` / `start` / `random`), `to` is the block a `goto`
+item leads to, `room` optionally restricts the action to fire only while the visitor is standing in
+that block (`itemUsableIn()` is the check, exported so the tests agree), and `start: true` puts it in
+the pack from the first screen. A room-gated item still shows its flavor everywhere; only the action
+is withheld, so a key reads the same in every room but turns only at its door. The escape rope is just the default
+item with `action: 'start'`; **`DEFAULT_ITEMS` is the original hardcoded pack, now editable**, and a
+map that leaves it untouched carries no `items` array at all (same copy-on-write omission as the
+theme). Delete every `start`/`goto`-to-start item and there is genuinely no reset — the author's
+call. Items are **never consumed**; tapping one is repeatable.
+
+Which items a visitor is currently holding is session state (`held`, an id list in `sessionStorage`
+under `ITEMS_KEY`), initialised from the `start` items and grown by **add-item buttons**: a `button`
+element with `action: 'additem'` and `to` an item id (`BUTTON_ACTIONS` now includes `additem`).
+`cellUrls()` deliberately does **not** collect an additem `to` — it's an item id, not a url. The pack
+button hides entirely when the catalogue is empty. `itemProblems()` (exported, run by the editor and
+`maze-check`) flags duplicate ids, missing names, and `goto` items pointing nowhere.
+
+## Theme
+
+The map carries an optional `theme` object — nine colours (`bg`, `title`, `text`, `muted`, `link`,
+`accent`, `arrow`, `border`, `packColor`), four fonts (`titleFont`, `lineFont`, `paraFont`,
+`packFont`, ids into the `FONTS` list), `arrowScale`, `packScale`, and the boolean `pack`. `accent`
+is buttons; `arrow` is the four navigation arrows, split off so they colour independently.
+`arrowScale` is a **multiplier on the base arrow size**, defaulting to `1.5` — arrows ship 50% bigger
+than the base `.lab-arrow` rule, and the theme tab can dial it 0.5–3×.
+
+The **backpack has its own set** — `packColor`, `packFont`, `packScale`, and `pack: false` to switch
+it off entirely (no button at all; the reset then only exists if a block hands the way back). They
+drive `--lab-pack` / `--lab-pack-font` / `--lab-pack-scale`, read by `.lab-pack`, `.lab-inventory`
+and `.lab-slot`. `THEME_BOOLS` is the new value class alongside `THEME_COLORS` / `THEME_FONTS` /
+`THEME_NUMBERS`; `themeJs` writes numbers and booleans bare and quotes the rest.
+
+Anything left at its `THEME_DEFAULTS` value isn't serialised.
+
+`applyTheme(theme, el)` paints it by overriding the CSS variables the `.lab-*` rules already read —
+`--card-bg`, `--green`, `--text-muted` and so on, plus `--lab-font-title/line/para`. It's set **on a
+container, never on `:root`**: the site puts it on `#labyrinth`, the editor puts it on its layout
+stage and its theme preview, and the editor's own chrome keeps the `:root` values. The panel colour
+`--bg` is derived from `bg` by `lift()` rather than being a separate control.
+
+Tunnels are untouched — a tunnel's `color` still overrides the background, and `isLight()` still
+picks its text colour.
+
+Fonts marked `google` in `FONTS` are fetched by `ensureFonts()` only when a theme actually uses one,
+so a theme using none makes no third-party request. The rest are the local `neogreekrunic.ttf`, the
+`JetBrains Mono` already in `styles.css`, or system stacks.
+
+`themeProblems()` checks colours parse, fonts exist, and — the useful one — that nothing has become
+unreadable against the background, via `contrastRatio()`. Thresholds live in `CONTRAST_NEEDS` and are
+read by the editor's live ratio readout, the problems tab and `maze-check` alike. **They sit a little
+under WCAG's 4.5/3.0** because the default link blue is 4.3:1 against the default background, and a
+checker that warns about its own shipped defaults is one nobody reads. There's a test asserting the
+default palette clears every bar in `CONTRAST_NEEDS`.
+
 ## Block layouts
 
 A cell can carry a `layout` array and arrange its contents itself instead of using the fixed centred
@@ -48,9 +106,11 @@ block, which is why `map.js` stays small.
 Elements sit on a **12 × 20 grid** (`GRID` in `labyrinth.js`) with `x`, `y`, `w`, `h` in grid units,
 0-indexed. Types: `title`, `line`, `para`, `image`, `button`, **10 of each** (`EL_LIMITS`) — a
 backstop against an unreadable block rather than a design rule, since the grid runs out first.
-Shared optional fields: `size` 1–5, `align`, `valign`, `href`. `image` takes `src` / `alt` / `fit`;
-`button` takes `action` (`url` / `goto` / `random`) and `to`. Anything equal to `EL_DEFAULTS` is
-left out when serialising, so the map file doesn't carry a wall of defaults.
+Shared optional fields: `size` 1–5, `align`, `valign`, `href`. `size` scales every type except
+`image` — for a `button` it drives the font on `.lab-el-button[data-size]` and, since the padding is
+`em`, the whole button grows with it. `image` takes `src` / `alt` / `fit`; `button` takes `action`
+(`url` / `goto` / `random` / `additem`) and `to`. Anything equal to `EL_DEFAULTS` is left out when
+serialising, so the map file doesn't carry a wall of defaults.
 
 **Clicking an image** opens it full-screen in `.lab-lightbox` — an image boxed into a few grid cells
 is too small for anything with detail in it. This only applies to images with **no `href`**: one the
@@ -97,9 +157,11 @@ squares, wrong contents; the real map is the XOR+base64 `LABYRINTH_CACHE` blob u
 array is the same in both, since the urls aren't the secret, where they sit is. The editor emits the
 whole file — **never hand-edit any of it.**
 
-- `_tools/labyrinth-editor.html` — visual editor. Open it directly as a file; no server. Four tabs:
+- `_tools/labyrinth-editor.html` — visual editor. Open it directly as a file; no server. Five tabs:
   **block** edits the selected block, **links** is the catalogue, **place** drags links onto the
-  grid, **problems** is live validation. The ✎ on a block (or "arrange this block…") opens **layout
+  grid, **theme** is the palette and fonts, **pack** edits the inventory items, **issues** is live
+  validation. The ✎ on a block (or
+  "arrange this block…") opens **layout
   mode**, an overlay sharing `<main>`'s first grid cell with `#canvas` so it covers the map without
   scrolling with it; the side panel becomes the element palette and settings. Its stage renders the
   block at true pixel size inside a scaled-down wrapper, so `clamp()`ed fonts and the capped canvas

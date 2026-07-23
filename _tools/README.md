@@ -17,7 +17,7 @@ visible to anyone browsing the repo on github.com, just not on the live site.
   paragraph, an image, a button.
 
 The labyrinth is the whole site. There is no front page and no way out — the escape rope
-in the backpack drops you back at the start block.
+in the backpack drops you back at the start block (unless you delete it; see The pack).
 
 ## labyrinth-editor.html
 
@@ -42,6 +42,84 @@ it needs — the links, the map, the movement rules — comes from `../map.js` a
 - the amber **tunnel block** card makes a tunnel. Its block tab gives you a background
   color, two timings, one of five effects (fade, crossfade, slide, iris, flicker), and the
   odds of each way out
+- the **theme** tab is the whole site's colours and fonts — see below
+- the **pack** tab is the backpack's items — see below
+
+## The pack
+
+The backpack holds items. They're text — a name, and a line that shows when the visitor
+taps them. An item can also *do* something when tapped:
+
+- **nothing** — just shows its line
+- **go to a block** — a wormhole in your pocket; you pick the block
+- **back to the start** — what the escape rope does
+- **jump somewhere at random**
+
+An item that does something can also be **limited to one room**. Leave it "usable
+anywhere" and it works wherever the visitor taps it; pick a block and the action only fires
+while they're standing in that block — a key that turns nothing until you're at the right
+door. The item's line still shows everywhere, so it reads the same; it just doesn't *do*
+anything until you're in the room. (The line is the only feedback, so word it to suit.)
+
+Each item has a **starts in pack** checkbox. Checked, the visitor has it from the first
+screen. Unchecked, it only appears once an **add-item button** hands it over (see the
+button element in layout mode — set its action to "add an item to the pack" and choose
+which). Items are never used up; a visitor can tap one as many times as they like.
+
+The five default items — the escape rope and its four useless companions — are just a
+starting point. Edit them, delete them, add your own. If you change nothing they aren't
+written into `map.js` at all. **Delete every "back to the start" item and there's no reset
+button any more** — that's allowed, just know it's the only way back.
+
+An add-item button pointing at an item you later delete goes dead; the issues tab flags it,
+same as a go-to button pointing at a deleted block.
+
+## Theme
+
+Seven colours and three fonts, and they apply everywhere at once. The preview at the top
+of the tab is a real block using the real rules, so it isn't lying to you. If layout mode
+is open, that updates live too.
+
+The colours are named by the job they do:
+
+| what | where you'll see it |
+| --- | --- |
+| background | behind every block. **tunnels override this** with their own colour |
+| titles & highlights | title text, and anything hovered |
+| strong text | `**bold**` inside a paragraph |
+| body text | single lines and paragraph text |
+| links | links inside paragraphs |
+| buttons | button labels and outlines |
+| direction arrows | the four navigation arrows |
+| borders | button outlines, the backpack panel |
+
+Buttons and arrows are separate colours — the arrows are the way *out* of a block, so it's
+worth being able to make them stand out on their own.
+
+Below the fonts is an **arrow size** slider. Arrows ship at 1.5× the old size; the slider
+goes from 0.5× to 3× if you want them bigger or smaller still.
+
+The **backpack** has its own block at the bottom: a checkbox to show or hide it, and its own
+colour, font and size. Turn it off and there's no backpack button at all — which also means
+no escape rope, so make sure some block hands the visitor a way back first (or don't, if
+that's the point). Everything else in the panel — the item names, the heading — follows the
+backpack colour and font, and grows with the size.
+
+The inventory panel's own background isn't a separate choice — it's worked out from the
+page background, so those two can never drift apart and start looking unrelated.
+
+Next to each colour is a number like `7.2:1`. That's how far it stands out from the
+background. **It goes red when text is getting hard to read** — around 4:1 for body text,
+3:1 for titles and arrows, which are bigger. Red isn't fatal; it's a warning that shows up
+in the issues tab too. Use your judgement, especially for something decorative.
+
+Fonts are set separately for titles, single lines and paragraphs. Anything marked
+**(google)** is fetched from Google Fonts the first time a theme uses it — pick only from
+the unmarked ones if you'd rather the site made no third-party requests at all. The runes
+are a font file in the repo, so they cost nothing.
+
+**reset to default** puts everything back. A theme left entirely at the defaults isn't
+written into `map.js` at all.
 
 ## Arranging a block
 
@@ -104,9 +182,13 @@ link field tells you which one you're getting.
 
 ### The button
 
-One per block. It either opens a link, sends the visitor to a block you name, or throws
-them at a random chamber. A go-to button pointing at a block that no longer exists is a
-hard error — it's a dead end someone can actually press.
+A button opens a link, sends the visitor to a block you name, throws them at a random
+chamber, or drops an item into the pack. A go-to button pointing at a block that no longer
+exists — or an add-item button pointing at an item you deleted — is a hard error, since
+it's a dead end someone can actually press.
+
+Buttons have a **size** just like the text elements, 1 to 5. The whole button grows with
+it, not only the label.
 
 ## Testing without pasting anything
 

@@ -1,8 +1,33 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 
+/* Local display fonts. The theme tab exposes each of these by the id in the
+   FONTS list in labyrinth.js — keep the family names here in step with the
+   `stack` there. Paths are relative to this file, which sits at the repo root,
+   so they resolve the same on the site and in _tools/labyrinth-editor.html
+   (which loads ../styles.css). */
 @font-face {
   font-family: 'NeoGreekRunic';
-  src: url('neogreekrunic.ttf') format('truetype');
+  src: url('fonts/neogreekrunic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Regulon18';
+  src: url('fonts/Regulon18-Regular.otf') format('opentype');
+}
+
+@font-face {
+  font-family: 'AmazingDigital';
+  src: url('fonts/amazingdigital100acrewoods.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Quadramatic';
+  src: url('fonts/quadramatic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'SplitBits';
+  src: url('fonts/splitbitsv2.ttf') format('truetype');
 }
 
 * {
@@ -23,6 +48,19 @@
   --blue:        #45C8E0; /* nord8 frost blue — boosted saturation */
   --blue-mid:    #4D9ED8; /* nord9 frost medium blue — boosted saturation */
   --transition:  0.15s ease;
+
+  /* The map's theme overrides all of the above, plus these, by setting them on
+     the .labyrinth container — see applyTheme() in labyrinth.js. What's here is
+     what a map with no theme of its own gets. The arrows carry their own colour
+     and their own size, both split off from the button accent (--teal). */
+  --lab-font-title: 'NeoGreekRunic', monospace;
+  --lab-font-line:  'JetBrains Mono', Monaco, monospace;
+  --lab-font-para:  'JetBrains Mono', Monaco, monospace;
+  --lab-arrow:       #4ECFCD;
+  --lab-arrow-scale: 1.5;
+  --lab-pack:        #D8DEE9;
+  --lab-pack-font:  'JetBrains Mono', Monaco, monospace;
+  --lab-pack-scale:  1;
 }
 
 /* The labyrinth is the whole page, so the body never scrolls — every block is
@@ -125,7 +163,7 @@ body {
 /* Five steps, each a clamp so a phone never gets microscopic text and a desktop
    never gets a headline that eats the screen. cqw tracks the canvas width, which
    is capped, so the top of each range is reached and held. */
-.lab-el-title { color: var(--green); font-family: 'NeoGreekRunic', monospace; line-height: 1.25; }
+.lab-el-title { color: var(--green); font-family: var(--lab-font-title); line-height: 1.25; }
 .lab-el-title[data-size='1'] { font-size: clamp(1.1rem, 5cqw, 1.9rem); }
 .lab-el-title[data-size='2'] { font-size: clamp(1.4rem, 7cqw, 2.6rem); }
 .lab-el-title[data-size='3'] { font-size: clamp(1.8rem, 9cqw, 3.4rem); }
@@ -134,7 +172,7 @@ body {
 
 a.lab-el-link:hover .lab-el-text { color: var(--teal); }
 
-.lab-el-line { color: var(--text-muted); line-height: 1.4; }
+.lab-el-line { color: var(--text-muted); font-family: var(--lab-font-line); line-height: 1.4; }
 .lab-el-line[data-size='1'] { font-size: clamp(0.7rem, 2.4cqw, 0.9rem); }
 .lab-el-line[data-size='2'] { font-size: clamp(0.8rem, 3cqw, 1.05rem); }
 .lab-el-line[data-size='3'] { font-size: clamp(0.9rem, 3.6cqw, 1.25rem); }
@@ -152,6 +190,7 @@ a.lab-el-link:hover .lab-el-text { color: var(--teal); }
 .lab-el-para {
   display: block;
   color: var(--text-muted);
+  font-family: var(--lab-font-para);
   line-height: 1.55;
   overflow: auto;
   touch-action: pan-y;
@@ -246,9 +285,10 @@ a.lab-el-link:hover .lab-el-text { color: var(--teal); }
   align-items: center;
   justify-content: center;
   max-width: 100%;
+  /* padding is em, so it grows with the font — sizing the text sizes the whole
+     button. The font itself comes from the wrapper's data-size, below. */
   padding: 0.5em 1.1em;
-  font-family: inherit;
-  font-size: clamp(0.8rem, 3cqw, 1.05rem);
+  font-family: var(--lab-font-line);
   color: var(--teal);
   text-decoration: none;
   background: none;
@@ -256,6 +296,14 @@ a.lab-el-link:hover .lab-el-text { color: var(--teal); }
   cursor: pointer;
   transition: color var(--transition), border-color var(--transition);
 }
+
+/* five steps, same idea as the text elements — size 3 is the middle, and the
+   whole button scales because its padding is measured in em */
+.lab-el-button[data-size='1'] .lab-btn { font-size: clamp(0.7rem, 2.2cqw, 0.9rem); }
+.lab-el-button[data-size='2'] .lab-btn { font-size: clamp(0.78rem, 2.7cqw, 1rem); }
+.lab-el-button[data-size='3'] .lab-btn { font-size: clamp(0.85rem, 3.2cqw, 1.15rem); }
+.lab-el-button[data-size='4'] .lab-btn { font-size: clamp(1rem, 4.2cqw, 1.5rem); }
+.lab-el-button[data-size='5'] .lab-btn { font-size: clamp(1.2rem, 5.2cqw, 1.9rem); }
 
 .lab-btn:hover {
   color: var(--green);
@@ -288,7 +336,7 @@ a.lab-el-link:hover .lab-el-text { color: var(--teal); }
 
 .lab-title {
   display: block;
-  font-family: 'NeoGreekRunic', monospace;
+  font-family: var(--lab-font-title);
   font-size: clamp(2rem, 9vw, 3.5rem);
   line-height: 1.4;
   color: var(--green);
@@ -324,9 +372,11 @@ a.lab-link:hover .lab-title {
   background: none;
   border: none;
   padding: 0.5rem;
-  font-size: 1.25rem;
+  /* the theme's arrow size is a multiplier on this base, so 1.5 (the default)
+     lands at 1.875rem */
+  font-size: calc(1.25rem * var(--lab-arrow-scale, 1.5));
   line-height: 1;
-  color: var(--teal);
+  color: var(--lab-arrow);
   opacity: 0.45;
   cursor: pointer;
   transition: opacity var(--transition);
@@ -360,7 +410,7 @@ a.lab-link:hover .lab-title {
 /* --- tunnels: blocks you pass through rather than stop in ----------------- */
 
 .lab-tunnel .lab-title {
-  font-family: 'JetBrains Mono', Monaco, monospace;
+  font-family: var(--lab-font-line);
   font-size: clamp(1.1rem, 4.5vw, 1.9rem);
   line-height: 1.5;
   color: var(--text);
@@ -425,6 +475,8 @@ a.lab-link:hover .lab-title {
   100% { opacity: 1; }
 }
 
+/* text, not an icon — a small word in the corner. Colour, font and size are its
+   own theme controls, separate from the block content. */
 .lab-pack {
   position: absolute;
   top: 0.75rem;
@@ -432,17 +484,23 @@ a.lab-link:hover .lab-title {
   z-index: 110;
   background: none;
   border: 1px solid transparent;
-  padding: 0.35rem 0.5rem;
-  font-size: 1.35rem;
+  padding: 0.35rem 0.6rem;
+  font-family: var(--lab-pack-font);
+  font-size: calc(0.8rem * var(--lab-pack-scale, 1));
+  letter-spacing: 0.08em;
   line-height: 1;
+  color: var(--lab-pack);
   cursor: pointer;
   opacity: 0.7;
-  transition: opacity var(--transition), border-color var(--transition);
+  transition: opacity var(--transition), border-color var(--transition), color var(--transition);
 }
+
+.lab-pack[hidden] { display: none; }
 
 .lab-pack:hover,
 .lab-pack[aria-expanded='true'] {
   opacity: 1;
+  color: var(--text);
   border-color: var(--card-border);
 }
 
@@ -455,13 +513,14 @@ a.lab-link:hover .lab-title {
   background: var(--bg);
   border: 1px solid var(--card-border);
   padding: 0.75rem;
+  font-family: var(--lab-pack-font);
 }
 
 .lab-inv-title {
-  font-size: 0.75rem;
+  font-size: calc(0.75rem * var(--lab-pack-scale, 1));
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--teal);
+  color: var(--lab-pack);
   margin-bottom: 0.5rem;
 }
 
@@ -470,14 +529,12 @@ a.lab-link:hover .lab-title {
 }
 
 .lab-slot {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  display: block;
   width: 100%;
-  font-family: inherit;
-  font-size: 0.9rem;
+  font-family: var(--lab-pack-font);
+  font-size: calc(0.9rem * var(--lab-pack-scale, 1));
   text-align: left;
-  color: var(--text-muted);
+  color: var(--lab-pack);
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   margin-bottom: 0.35rem;
@@ -491,8 +548,10 @@ a.lab-link:hover .lab-title {
   border-color: var(--green);
 }
 
-.lab-slot-icon {
-  font-size: 1.1rem;
+.lab-empty {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 .lab-flavor {
@@ -501,6 +560,25 @@ a.lab-link:hover .lab-title {
   font-size: 0.8rem;
   color: var(--blue-mid);
 }
+
+/* the line that flashes up when an add-item button hands you something */
+.lab-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 2.5rem;
+  z-index: 120;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 2rem);
+  padding: 0.5rem 0.9rem;
+  font-family: var(--lab-font-line);
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  animation: lab-lightbox-in 0.18s ease;
+}
+
+.lab-toast[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .lab-page {
@@ -524,7 +602,8 @@ a.lab-link:hover .lab-title {
     animation: none !important;
   }
 
-  .lab-lightbox {
+  .lab-lightbox,
+  .lab-toast {
     animation: none;
   }
 }

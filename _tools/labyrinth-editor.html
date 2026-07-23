@@ -181,10 +181,12 @@
 
   .tabs { display: flex; gap: 0.3rem; }
 
+  /* five of these now, in a 20rem panel — the padding is what gives */
   .tab {
     flex: 1;
-    font-size: 11px;
-    padding: 0.4rem 0.2rem;
+    min-width: 0;
+    font-size: 10px;
+    padding: 0.4rem 0.1rem;
     color: var(--muted);
     background: none;
     border-color: transparent;
@@ -295,6 +297,32 @@
   .link-row input[data-f="url"] { font-size: 10px; }
   .link-row input[data-f="category"] { font-size: 10px; color: var(--muted); }
 
+  /* the pack tab reuses the link-row shell */
+  .item-row {
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    padding: 0.4rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .item-row.bad { border-color: var(--red); }
+
+  .item-row-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  .item-row-head .start-tag { margin-left: auto; color: var(--teal); }
+  .item-row input, .item-row select { display: block; width: 100%; margin-bottom: 0.2rem; }
+  .item-row input[data-f="name"] { color: var(--blue); }
+  .item-row input[data-f="flavor"] { font-size: 10px; color: var(--muted); }
+  .item-row .item-start { display: flex; align-items: center; gap: 0.35rem; font-size: 10px; color: var(--muted); margin-bottom: 0; }
+  .item-row .item-start input { width: auto; margin: 0; }
+
   .drag-ghost {
     position: fixed;
     z-index: 50;
@@ -321,6 +349,112 @@
   .issue.ok { color: var(--green); }
 
   .hint { font-size: 10px; color: var(--muted); opacity: .7; line-height: 1.5; }
+
+  /* --- the theme tab ------------------------------------------------------ */
+
+  .swatch-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .swatch-row input[type="color"] {
+    width: 2rem;
+    height: 1.6rem;
+    padding: 1px;
+    flex: none;
+  }
+
+  .swatch-row .what { flex: 1; font-size: 11px; }
+  .swatch-row .what small { display: block; font-size: 9px; color: var(--muted); opacity: .7; }
+  .swatch-row input[type="text"] { width: 5.2rem; font-size: 10px; }
+
+  /* how legible this colour is on the background, worked out live */
+  .swatch-row .ratio {
+    width: 3rem;
+    text-align: right;
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  .swatch-row .ratio.thin { color: var(--red); }
+
+  .font-row { margin-bottom: 0.45rem; }
+  .font-row label { display: block; font-size: 10px; color: var(--muted); margin-bottom: 0.15rem; }
+  .font-row select { width: 100%; }
+
+  .arrow-size-row { display: flex; align-items: center; gap: 0.5rem; }
+  .arrow-size-row label { font-size: 10px; color: var(--muted); }
+  .arrow-size-row input[type="range"] { flex: 1; }
+  .arrow-size-row .out { width: 2.4rem; text-align: right; font-size: 10px; color: var(--teal); }
+
+  /* A real block, at a real size, using the real .lab-* rules — the same reason
+     the layout stage renders actual elements instead of a mock-up. */
+  #theme-preview {
+    border: 1px solid var(--border);
+    padding: 0.9rem 0.8rem;
+    text-align: center;
+  }
+
+  #theme-preview .t {
+    font-family: var(--lab-font-title);
+    font-size: 1.5rem;
+    line-height: 1.2;
+    color: var(--green);
+  }
+
+  #theme-preview .l {
+    font-family: var(--lab-font-line);
+    font-size: 0.7rem;
+    margin-top: 0.3rem;
+    color: var(--text-muted);
+  }
+
+  #theme-preview .p {
+    font-family: var(--lab-font-para);
+    font-size: 0.65rem;
+    line-height: 1.5;
+    margin-top: 0.5rem;
+    text-align: left;
+    color: var(--text-muted);
+  }
+
+  #theme-preview .p b { color: var(--text); }
+  #theme-preview .p a { color: var(--blue-mid); text-decoration: underline; }
+
+  #theme-preview .b {
+    display: inline-block;
+    margin-top: 0.6rem;
+    padding: 0.3em 0.9em;
+    font-family: var(--lab-font-line);
+    font-size: 0.65rem;
+    color: var(--teal);
+    border: 1px solid var(--card-border);
+  }
+
+  #theme-preview .arrows {
+    margin-top: 0.5rem;
+    font-size: calc(0.55rem * var(--lab-arrow-scale, 1.5));
+    color: var(--lab-arrow);
+    opacity: .55;
+  }
+
+  #theme-preview .pk {
+    display: inline-block;
+    margin-top: 0.6rem;
+    padding: 0.2em 0.6em;
+    font-family: var(--lab-pack-font);
+    font-size: calc(0.7rem * var(--lab-pack-scale, 1));
+    letter-spacing: 0.08em;
+    color: var(--lab-pack);
+    border: 1px solid var(--card-border);
+  }
+
+  #theme-preview .pk[data-off] { opacity: .4; text-decoration: line-through; }
+
+  .pack-toggle { display: flex; align-items: center; gap: 0.4rem; font-size: 11px; color: var(--muted); margin-bottom: 0.5rem; }
+  .pack-toggle input { width: auto; }
 
   /* --- layout mode: the block-arrangement overlay ------------------------- */
 
@@ -588,7 +722,9 @@
       <button class="tab active" data-tab="block">block</button>
       <button class="tab" data-tab="links">links</button>
       <button class="tab" data-tab="place">place</button>
-      <button class="tab" data-tab="problems">problems<span class="tab-badge" id="problem-count" hidden></span></button>
+      <button class="tab" data-tab="theme">theme</button>
+      <button class="tab" data-tab="items">pack</button>
+      <button class="tab" data-tab="problems">issues<span class="tab-badge" id="problem-count" hidden></span></button>
     </div>
 
     <section class="pane" data-pane="block">
@@ -702,12 +838,14 @@
             <option value="url">open a link</option>
             <option value="goto">go to a block</option>
             <option value="random">jump somewhere at random</option>
+            <option value="additem">add an item to the pack</option>
           </select>
           <div id="el-to-url" style="margin-top:0.35rem">
             <select id="f-el-tolink"></select>
             <input id="f-el-to" type="text" placeholder="https://…" style="margin-top:0.25rem">
           </div>
           <select id="f-el-toblock" style="margin-top:0.35rem" hidden></select>
+          <select id="f-el-toitem" style="margin-top:0.35rem" hidden></select>
         </div>
 
         <div class="field" id="el-href-field">
@@ -775,6 +913,58 @@
     <section class="pane" data-pane="place" hidden>
       <p class="hint">drag a card onto an empty square to add it. drop it on an existing block to swap that block's link.</p>
       <div id="deck"></div>
+    </section>
+
+    <section class="pane" data-pane="theme" hidden>
+      <p class="hint">how the whole site looks. tunnels keep their own background colour — this is everything else.</p>
+
+      <h2 style="margin-top:0.8rem">preview</h2>
+      <div id="theme-preview"></div>
+
+      <h2 style="margin-top:1rem">colours</h2>
+      <div id="theme-colors"></div>
+
+      <h2 style="margin-top:1rem">fonts</h2>
+      <div id="theme-fonts"></div>
+
+      <h2 style="margin-top:1rem">arrows</h2>
+      <div class="arrow-size-row">
+        <label>size</label>
+        <input id="theme-arrow-scale" type="range" min="0.5" max="3" step="0.1">
+        <span id="theme-arrow-out" class="out"></span>
+      </div>
+
+      <h2 style="margin-top:1rem">backpack</h2>
+      <label class="pack-toggle"><input id="theme-pack-show" type="checkbox"> show the backpack</label>
+      <div id="theme-pack-fields">
+        <div class="swatch-row" data-key="packColor">
+          <input type="color" data-color="packColor">
+          <span class="what">colour<small>the button, and the panel it opens</small></span>
+          <input type="text" data-hex="packColor" spellcheck="false">
+          <span class="ratio"></span>
+        </div>
+        <div class="font-row">
+          <label>font</label>
+          <select data-font="packFont"></select>
+        </div>
+        <div class="arrow-size-row">
+          <label>size</label>
+          <input id="theme-pack-scale" type="range" min="0.5" max="3" step="0.1">
+          <span id="theme-pack-out" class="out"></span>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="theme-reset">reset to default</button>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="items" hidden>
+      <p class="hint">the backpack. items are text — a name and a line that shows when the visitor taps them. an item can also do something: send them to a block, back to the start, or somewhere at random. a block's button can hand out any of these.</p>
+      <div id="item-list"></div>
+      <div class="row">
+        <button id="add-item">add item</button>
+      </div>
     </section>
 
     <section class="pane" data-pane="problems" hidden>
@@ -1023,7 +1213,7 @@
   /* ------------------------------------------------------------- validation */
 
   function validate(index, live) {
-    var out = [];
+    var out = L.themeProblems(state.maze.theme);
 
     state.maze.cells.forEach(function (cell) {
       if (!live.has(cell.id)) {
@@ -1078,6 +1268,8 @@
       out.push(['bad', 'the start block is a tunnel — visitors would arrive mid-transition']);
     }
 
+    L.itemProblems(state.maze, index).forEach(function (p) { out.push(p); });
+
     return out;
   }
 
@@ -1095,9 +1287,7 @@
     return counts;
   }
 
-  function renderPanel(index, live) {
-    var issues = validate(index, live);
-
+  function showIssues(issues) {
     document.getElementById('problems').innerHTML = issues.length
       ? issues.map(function (p) { return '<div class="issue ' + p[0] + '">' + esc(p[1]) + '</div>'; }).join('')
       : '<div class="issue ok">all good</div>';
@@ -1105,6 +1295,17 @@
     var badge = document.getElementById('problem-count');
     badge.textContent = issues.length;
     badge.hidden = !issues.length;
+  }
+
+  /* Re-runs validation on its own, for edits that can't have changed the map's
+     shape — a colour or a font — so they don't have to redraw the whole grid. */
+  function refreshProblems() {
+    var index = L.indexMaze(state.maze);
+    showIssues(validate(index, L.reachableFrom(index, state.maze.start)));
+  }
+
+  function renderPanel(index, live) {
+    showIssues(validate(index, live));
 
     var counts = placementCounts();
     var groups = groupByCategory(allLinks());
@@ -1805,6 +2006,349 @@
     draw();
   });
 
+  /* ================================================================ theme ==
+
+     The map's colours and fonts. Everything here writes to state.maze.theme and
+     then repaints, so the preview, the layout stage and a test run all show the
+     same thing without any of them keeping a second copy of the rules. */
+
+  var COLOR_ROLES = [
+    ['bg', 'background', 'behind every block. tunnels override it.'],
+    ['title', 'titles & highlights', 'title text, hover states'],
+    ['text', 'strong text', 'bold inside paragraphs'],
+    ['muted', 'body text', 'single lines and paragraphs'],
+    ['link', 'links', 'links inside paragraphs'],
+    ['accent', 'buttons', 'button labels and outlines'],
+    ['arrow', 'direction arrows', 'the four navigation arrows'],
+    ['border', 'borders', 'button outlines, the inventory panel']
+  ];
+
+  var FONT_ROLES = [
+    ['titleFont', 'titles'],
+    ['lineFont', 'single lines & buttons'],
+    ['paraFont', 'paragraphs']
+  ];
+
+  function theme() {
+    return state.maze.theme || (state.maze.theme = {});
+  }
+
+  function themeValue(key) {
+    var v = theme()[key];
+    return v === undefined || v === null || v === '' ? L.THEME_DEFAULTS[key] : v;
+  }
+
+  function renderTheme() {
+    document.getElementById('theme-colors').innerHTML = COLOR_ROLES.map(function (role) {
+      var key = role[0];
+      var value = themeValue(key);
+
+      return '<div class="swatch-row" data-key="' + key + '">' +
+        '<input type="color" data-color="' + key + '" value="' + esc(value) + '">' +
+        '<span class="what">' + esc(role[1]) + '<small>' + esc(role[2]) + '</small></span>' +
+        '<input type="text" data-hex="' + key + '" value="' + esc(value) + '" spellcheck="false">' +
+        '<span class="ratio"></span>' +
+        '</div>';
+    }).join('');
+
+    document.getElementById('theme-fonts').innerHTML = FONT_ROLES.map(function (role) {
+      var key = role[0];
+      var current = themeValue(key);
+
+      return '<div class="font-row">' +
+        '<label>' + esc(role[1]) + '</label>' +
+        '<select data-font="' + key + '">' + L.FONTS.map(function (f) {
+          return '<option value="' + esc(f.id) + '"' + (f.id === current ? ' selected' : '') + '>' +
+            esc(f.label) + (f.google ? ' (google)' : '') + '</option>';
+        }).join('') + '</select>' +
+        '</div>';
+    }).join('');
+
+    /* the ranges and the backpack controls are static markup, so set their
+       values here rather than rebuilding them */
+    document.getElementById('theme-arrow-scale').value = themeValue('arrowScale');
+
+    document.querySelector('[data-color="packColor"]').value = themeValue('packColor');
+    document.querySelector('[data-hex="packColor"]').value = themeValue('packColor');
+    document.querySelector('[data-font="packFont"]').innerHTML = L.FONTS.map(function (f) {
+      return '<option value="' + esc(f.id) + '"' + (f.id === themeValue('packFont') ? ' selected' : '') + '>' +
+        esc(f.label) + (f.google ? ' (google)' : '') + '</option>';
+    }).join('');
+    document.getElementById('theme-pack-scale').value = themeValue('packScale');
+    document.getElementById('theme-pack-show').checked = themeValue('pack') !== false;
+
+    paintTheme();
+  }
+
+  /* Repaints everything the theme touches without rebuilding any inputs, so it
+     is safe to call on every keystroke. */
+  function paintTheme() {
+    var t = state.maze.theme;
+    var preview = document.getElementById('theme-preview');
+
+    L.applyTheme(t, preview);
+    preview.style.background = themeValue('bg');
+    var packOff = themeValue('pack') === false;
+    preview.innerHTML =
+      '<div class="t">a title</div>' +
+      '<div class="l">a single line of text</div>' +
+      '<div class="p">A paragraph, with <b>bold</b> and <a href="#">a link</a> in it, ' +
+      'set at the size most of them will be.</div>' +
+      '<div class="b">a button</div>' +
+      '<div class="arrows">▲ ▼ ◀ ▶</div>' +
+      '<div class="pk"' + (packOff ? ' data-off="1"' : '') + '>backpack' + (packOff ? ' (off)' : '') + '</div>';
+
+    /* the layout stage is a real block, so it has to follow the theme too */
+    if (!layOverlay.hidden) L.applyTheme(t, layPage);
+
+    document.getElementById('theme-arrow-out').textContent =
+      (Math.round(themeValue('arrowScale') * 100) / 100) + '×';
+    document.getElementById('theme-pack-out').textContent =
+      (Math.round(themeValue('packScale') * 100) / 100) + '×';
+    document.getElementById('theme-pack-fields').style.opacity = packOff ? '0.4' : '';
+
+    var bg = themeValue('bg');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-pane="theme"] .swatch-row'), function (row) {
+      var key = row.dataset.key;
+      var out = row.querySelector('.ratio');
+
+      if (key === 'bg' || key === 'border') { out.textContent = ''; return; }
+
+      var ratio = L.contrastRatio(themeValue(key), bg);
+      if (ratio === null) { out.textContent = '—'; return; }
+
+      /* same thresholds the problems tab and maze-check use, read from the one
+         place they're defined rather than repeated here */
+      var need = L.CONTRAST_NEEDS.filter(function (n) { return n[0] === key; })[0];
+      out.textContent = (Math.round(ratio * 10) / 10) + ':1';
+      out.classList.toggle('thin', !!need && ratio < need[2]);
+    });
+  }
+
+  function setTheme(key, value) {
+    /* anything back at its default comes straight out again, so a map that has
+       not really been themed doesn't carry a theme block at all */
+    if (value === L.THEME_DEFAULTS[key]) delete theme()[key];
+    else theme()[key] = value;
+
+    if (!Object.keys(theme()).length) delete state.maze.theme;
+
+    paintTheme();
+    save();
+    refreshProblems();
+  }
+
+  /* Bound to the whole theme pane, not just #theme-colors, so the backpack's own
+     colour swatch and font select (which live in their own section) go through
+     the same paths. */
+  var themePane = document.querySelector('[data-pane="theme"]');
+
+  themePane.addEventListener('input', function (e) {
+    var key = e.target.dataset.color || e.target.dataset.hex;
+    if (!key) return;
+
+    var value = e.target.value.trim();
+    if (e.target.dataset.hex) {
+      if (!/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(value)) return; /* mid-type */
+      var pair = document.querySelector('[data-color="' + key + '"]');
+      if (pair) pair.value = value;
+    } else {
+      var hex = document.querySelector('[data-hex="' + key + '"]');
+      if (hex) hex.value = value;
+    }
+
+    setTheme(key, value);
+  });
+
+  themePane.addEventListener('change', function (e) {
+    if (!e.target.dataset.font) return;
+    setTheme(e.target.dataset.font, e.target.value);
+  });
+
+  document.getElementById('theme-arrow-scale').addEventListener('input', function (e) {
+    /* round so the range's float steps land on a value that can equal the
+       default (1.5) exactly and so be dropped from the serialised theme */
+    setTheme('arrowScale', Math.round(Number(e.target.value) * 10) / 10);
+  });
+
+  document.getElementById('theme-pack-scale').addEventListener('input', function (e) {
+    setTheme('packScale', Math.round(Number(e.target.value) * 10) / 10);
+  });
+
+  document.getElementById('theme-pack-show').addEventListener('change', function (e) {
+    /* checked is the default (shown), so it drops out; unchecked writes pack:false */
+    setTheme('pack', e.target.checked);
+  });
+
+  document.getElementById('theme-reset').addEventListener('click', function () {
+    if (!confirm('put every colour and font back to the default?')) return;
+
+    delete state.maze.theme;
+    renderTheme();
+    save();
+    refreshProblems();
+  });
+
+  /* ================================================================ items ==
+
+     Same copy-on-write shape as the theme: the map only carries an items array
+     once it differs from the default pack, so an untouched map stays small. */
+
+  function effectiveItems() {
+    return state.maze.items || L.DEFAULT_ITEMS;
+  }
+
+  /* materialise a private copy the moment something is edited */
+  function ownItems() {
+    if (!state.maze.items) state.maze.items = JSON.parse(JSON.stringify(L.DEFAULT_ITEMS));
+    return state.maze.items;
+  }
+
+  /* back to the shared default? then carry nothing, like the theme does */
+  function normalizeItems() {
+    if (state.maze.items && JSON.stringify(state.maze.items) === JSON.stringify(L.DEFAULT_ITEMS)) {
+      delete state.maze.items;
+    }
+  }
+
+  var ITEM_ACTION_LABELS = {
+    none: 'nothing — just show its text',
+    goto: 'go to a block',
+    start: 'back to the start',
+    random: 'jump somewhere at random'
+  };
+
+  function renderItems() {
+    var items = effectiveItems();
+
+    if (!items.length) {
+      document.getElementById('item-list').innerHTML =
+        '<p class="hint">no items. the backpack won’t appear at all until there’s at least one.</p>';
+      return;
+    }
+
+    document.getElementById('item-list').innerHTML = items.map(function (it, i) {
+      var action = it.action || 'none';
+      var opts = L.ITEM_ACTIONS.map(function (a) {
+        return '<option value="' + a + '"' + (a === action ? ' selected' : '') + '>' + esc(ITEM_ACTION_LABELS[a]) + '</option>';
+      }).join('');
+
+      return '<div class="item-row" data-i="' + i + '">' +
+        '<div class="item-row-head">' +
+          '<span>' + (i + 1) + '</span>' +
+          '<span class="start-tag"' + (it.start ? '' : ' hidden') + '>starts in pack</span>' +
+          '<button class="link-del" data-del="' + i + '" title="delete this item">✕</button>' +
+        '</div>' +
+        '<input data-f="name" type="text" placeholder="name" value="' + esc(it.name) + '">' +
+        '<input data-f="flavor" type="text" placeholder="the line shown when tapped" value="' + esc(it.flavor) + '">' +
+        '<select data-f="action">' + opts + '</select>' +
+        '<select data-f="to"' + (action === 'goto' ? '' : ' hidden') + '></select>' +
+        '<select data-f="room"' + (action === 'none' ? ' hidden' : '') + '></select>' +
+        '<label class="item-start"><input data-f="start" type="checkbox"' + (it.start ? ' checked' : '') + '> in the pack from the start</label>' +
+        '</div>';
+    }).join('');
+
+    /* fill the block pickers: `to` for a goto item, `room` for anything that
+       does something at all (where it's allowed to do it) */
+    Array.prototype.forEach.call(document.querySelectorAll('#item-list .item-row'), function (row) {
+      var it = items[Number(row.dataset.i)];
+      var action = it.action || 'none';
+      if (action === 'goto') {
+        fillBlockSelect(row.querySelector('[data-f="to"]'), it.to || '');
+      }
+      if (action !== 'none') {
+        fillBlockSelect(row.querySelector('[data-f="room"]'), it.room || '', '— usable anywhere —');
+      }
+    });
+  }
+
+  document.getElementById('item-list').addEventListener('input', function (e) {
+    var field = e.target.dataset.f;
+    if (!field) return;
+
+    var i = Number(e.target.closest('.item-row').dataset.i);
+    var it = ownItems()[i];
+    if (!it) return;
+
+    if (field === 'start') {
+      if (e.target.checked) it.start = true; else delete it.start;
+      e.target.closest('.item-row').querySelector('.start-tag').hidden = !e.target.checked;
+    } else if (field === 'name' || field === 'flavor') {
+      var v = e.target.value;
+      if (v) it[field] = v; else delete it[field];
+    } else if (field === 'to' || field === 'room') {
+      if (e.target.value) it[field] = e.target.value; else delete it[field];
+    }
+
+    normalizeItems();
+    save();
+    refreshProblems();
+  });
+
+  /* the action select flips which target control shows, so it rebuilds the row */
+  document.getElementById('item-list').addEventListener('change', function (e) {
+    if (e.target.dataset.f !== 'action') return;
+
+    var i = Number(e.target.closest('.item-row').dataset.i);
+    var it = ownItems()[i];
+    if (!it) return;
+
+    var action = e.target.value;
+    if (action === 'none') delete it.action; else it.action = action;
+    /* the target only means something for goto; the room limit only for an item
+       that does something — drop both when they'd be dead weight */
+    if (action !== 'goto') delete it.to;
+    if (action === 'none') delete it.room;
+
+    normalizeItems();
+    renderItems();
+    save();
+    refreshProblems();
+  });
+
+  document.getElementById('item-list').addEventListener('click', function (e) {
+    var del = e.target.closest('.link-del');
+    if (!del) return;
+
+    var i = Number(del.dataset.del);
+    var it = ownItems()[i];
+    if (!it) return;
+
+    /* warn if a button somewhere hands this item out — that button goes dead */
+    var usedBy = state.maze.cells.filter(function (c) {
+      return (c.layout || []).some(function (el) {
+        return el.type === 'button' && el.action === 'additem' && el.to === it.id;
+      });
+    }).length;
+    if (usedBy && !confirm(usedBy + ' button(s) add this item. delete it anyway? they’ll show up under issues.')) return;
+
+    ownItems().splice(i, 1);
+    normalizeItems();
+    renderItems();
+    save();
+    refreshProblems();
+  });
+
+  document.getElementById('add-item').addEventListener('click', function () {
+    var items = ownItems();
+
+    /* a fresh, unique id — items are referenced by it, so it can't collide */
+    var n = 0;
+    var taken = {};
+    items.forEach(function (it) { taken[it.id] = true; });
+    while (taken['item' + n]) n++;
+
+    items.push({ id: 'item' + n, name: '', flavor: '' });
+    normalizeItems();
+    renderItems();
+    save();
+    refreshProblems();
+
+    var rows = document.querySelectorAll('#item-list .item-row');
+    var fresh = rows[rows.length - 1];
+    if (fresh) fresh.querySelector('[data-f="name"]').focus();
+  });
+
   /* =========================================================== layout mode ==
 
      Arranging one block's contents on the 12x20 grid. The stage renders the
@@ -1884,6 +2428,7 @@
     document.getElementById('layout-who').textContent =
       'arranging ' + id + (cell.link ? ' — ' + linkTitle(cell.link) : '');
 
+    L.applyTheme(state.maze.theme, layPage);
     drawLayout();
   }
 
@@ -2250,7 +2795,8 @@
     document.getElementById('el-img-field').hidden = el.type !== 'image';
     document.getElementById('el-action-field').hidden = el.type !== 'button';
     document.getElementById('el-href-field').hidden = el.type === 'button' || el.type === 'para';
-    document.getElementById('el-size-field').hidden = el.type === 'image' || el.type === 'button';
+    /* buttons size like the text elements now — the whole button grows with it */
+    document.getElementById('el-size-field').hidden = el.type === 'image';
 
     /* a paragraph is always top-aligned: a centred box that overflows can't be
        scrolled back to its first line, so the control would be a lie */
@@ -2274,9 +2820,10 @@
 
     if (el.type === 'button') {
       document.getElementById('f-el-action').value = el.action || 'url';
-      document.getElementById('f-el-to').value = el.action === 'goto' ? '' : (el.to || '');
+      document.getElementById('f-el-to').value = el.action === 'goto' || el.action === 'additem' ? '' : (el.to || '');
       fillLinkSelect(document.getElementById('f-el-tolink'), el.action === 'url' ? el.to : '');
       fillBlockSelect(document.getElementById('f-el-toblock'), el.action === 'goto' ? el.to : '');
+      fillItemSelect(document.getElementById('f-el-toitem'), el.action === 'additem' ? el.to : '');
       showButtonTarget(el.action || 'url');
     }
 
@@ -2310,14 +2857,30 @@
   function showButtonTarget(action) {
     document.getElementById('el-to-url').hidden = action !== 'url';
     document.getElementById('f-el-toblock').hidden = action !== 'goto';
+    document.getElementById('f-el-toitem').hidden = action !== 'additem';
   }
 
-  function fillBlockSelect(select, current) {
-    select.innerHTML = '<option value="">— pick a block —</option>' +
+  function fillBlockSelect(select, current, placeholder) {
+    select.innerHTML = '<option value="">' + esc(placeholder || '— pick a block —') + '</option>' +
       state.maze.cells.filter(function (c) { return !L.isTunnel(c); }).map(function (c) {
         return '<option value="' + esc(c.id) + '"' + (c.id === current ? ' selected' : '') + '>' +
           esc(c.id + ' · ' + (c.title || linkTitle(c.link) || 'text only')) + '</option>';
       }).join('');
+  }
+
+  function fillItemSelect(select, current) {
+    var items = effectiveItems();
+    select.innerHTML = '<option value="">— pick an item —</option>' +
+      items.map(function (it) {
+        return '<option value="' + esc(it.id) + '"' + (it.id === current ? ' selected' : '') + '>' +
+          esc(it.name || it.id) + '</option>';
+      }).join('');
+
+    /* a button can point at an item the pack no longer has — keep it visible so
+       it isn't silently lost, and so the issues tab can flag it */
+    if (current && !items.some(function (it) { return it.id === current; })) {
+      select.insertAdjacentHTML('afterbegin', '<option value="' + esc(current) + '" selected>' + esc(current) + ' (missing)</option>');
+    }
   }
 
   /* Every image already used anywhere in the map, so the second block that wants
@@ -2439,6 +3002,10 @@
   });
 
   document.getElementById('f-el-toblock').addEventListener('change', function (e) {
+    elLiveCommit({ to: e.target.value });
+  });
+
+  document.getElementById('f-el-toitem').addEventListener('change', function (e) {
     elLiveCommit({ to: e.target.value });
   });
 
@@ -2628,11 +3195,40 @@
       at.exits = {};
       at.exits[dir] = n % 3 === 1 ? null : cells[(n * 11 + 2) % cells.length].id;
     }
-    return {
+    /* The theme rides along untouched — it's on screen the moment anyone opens
+       the site, so there is nothing to hide about it. */
+    var out = {
       start: cells.length ? cells[Math.floor(cells.length / 2)].id : 'c0',
       links: maze.links || [],
       cells: cells
     };
+    if (maze.theme && Object.keys(maze.theme).length) out.theme = maze.theme;
+
+    /* items keep their ids, actions and destinations — a button's add-item has to
+       still resolve in the decoy — and lie about what they are called */
+    if (maze.items) {
+      out.items = maze.items.map(function (it, i) {
+        var fake = {};
+        Object.keys(it).forEach(function (k) { fake[k] = it[k]; });
+        if (fake.name) fake.name = decoyText[(i * 2 + 1) % decoyText.length];
+        if (fake.flavor) fake.flavor = decoyText[(i * 3 + 4) % decoyText.length];
+        return fake;
+      });
+    }
+
+    return out;
+  }
+
+  function themeJs(t) {
+    var keys = L.THEME_COLORS.concat(L.THEME_FONTS).concat(L.THEME_NUMBERS).concat(L.THEME_BOOLS).filter(function (k) {
+      return t[k] !== undefined && t[k] !== null && t[k] !== '' && t[k] !== L.THEME_DEFAULTS[k];
+    });
+    if (!keys.length) return '';
+
+    /* numbers and booleans stay bare; colours and font ids are quoted strings */
+    return '  theme: { ' + keys.map(function (k) {
+      return k + ': ' + (typeof t[k] === 'number' || typeof t[k] === 'boolean' ? t[k] : q(t[k]));
+    }).join(', ') + ' },\n';
   }
 
   function linkJs(l) {
@@ -2640,6 +3236,20 @@
     if (l.description) parts.push('description: ' + q(l.description));
     if (l.category) parts.push('category: ' + q(l.category));
     return '      { ' + parts.join(', ') + ' }';
+  }
+
+  function itemJs(it) {
+    var parts = ['id: ' + q(it.id), 'name: ' + q(it.name || '')];
+    if (it.flavor) parts.push('flavor: ' + q(it.flavor));
+    if (it.action && it.action !== 'none') parts.push('action: ' + q(it.action));
+    if (it.to) parts.push('to: ' + q(it.to));
+    if (it.room) parts.push('room: ' + q(it.room));
+    if (it.start) parts.push('start: true');
+    return '      { ' + parts.join(', ') + ' }';
+  }
+
+  function itemsJs(items) {
+    return '  items: [\n' + items.map(itemJs).join(',\n') + '\n  ],\n';
   }
 
   /* Anything sitting at its default is left out entirely — with five settings on
@@ -2702,6 +3312,8 @@
       '\n' +
       'var LABYRINTH_MAP = {\n' +
       '  start: ' + q(decoy.start) + ',\n' +
+      (decoy.theme ? themeJs(decoy.theme) : '') +
+      (decoy.items ? itemsJs(decoy.items) : '') +
       '  links: [\n' + decoy.links.map(linkJs).join(',\n') + '\n  ],\n' +
       '  cells: [\n' + decoy.cells.map(cellJs).join(',\n') + '\n  ]\n' +
       '};\n' +
@@ -2788,6 +3400,8 @@
     state.selection = [];
     showInspector();
     renderLinks();
+    renderTheme();
+    renderItems();
     draw();
   }
 
