@@ -57,14 +57,16 @@ The backpack holds items. They're text — a name, and a line that shows when th
 taps them. An item can also *do* something when tapped:
 
 - **nothing** — just shows its line
-- **go to a block** — a wormhole in your pocket; you pick the block
+- **go to a block** — a wormhole in your pocket; you pick the block. It can be a tunnel,
+  and the visitor gets played through it to whatever's on the far side
 - **back to the start** — what the escape rope does
 - **jump somewhere at random**
 
 An item that does something can also be **limited to one room**. Leave it "usable
 anywhere" and it works wherever the visitor taps it; pick a block and the action only fires
 while they're standing in that block — a key that turns nothing until you're at the right
-door. The item's line still shows everywhere, so it reads the same; it just doesn't *do*
+door. Only chambers are offered here, not tunnels: nobody ever *stops* in a tunnel, so an
+item gated to one could never fire. The item's line still shows everywhere, so it reads the same; it just doesn't *do*
 anything until you're in the room. (The line is the only feedback, so word it to suit.)
 
 Each item has a **starts in pack** checkbox. Checked, the visitor has it from the first
@@ -198,6 +200,10 @@ A button opens a link, sends the visitor to a block you name, throws them at a r
 chamber, or drops an item into the pack. A go-to button pointing at a block that no longer
 exists — or an add-item button pointing at an item you deleted — is a hard error, since
 it's a dead end someone can actually press.
+
+The destination can be a **tunnel**. The visitor is played through it and lands in the
+chamber on the far side, which is a good way to make somewhere feel earned rather than
+just handed over. Tunnels show up in the picker labelled `tunnel`.
 
 Buttons have a **size** just like the text elements, 1 to 5. The whole button grows with
 it, not only the label.

@@ -440,10 +440,10 @@
       if (action === 'goto') {
         /* The one that really matters. Every other mistake here is cosmetic; a
            button offering a way onward that goes nowhere is a dead end the
-           visitor can actually press. */
-        if (!el.to) out.push(['bad', where + ' is a go-to button with no block chosen']);
+           visitor can actually press. A tunnel is a perfectly good target —
+           travelTo() plays it and carries on to the chamber beyond. */
+        if (!el.to) out.push(['bad', where + ' is a go-to button with nothing chosen']);
         else if (!index.byId.get(el.to)) out.push(['bad', where + ' points at ' + el.to + ', which no longer exists']);
-        else if (isTunnel(index.byId.get(el.to))) out.push(['warn', where + ' points at ' + el.to + ', a tunnel — the visitor gets routed straight through it']);
       } else if (action === 'url') {
         if (!el.to) out.push(['warn', where + ' is a link button with no link on it']);
         else if (!safeUrl(el.to)) out.push(['bad', where + ' has a destination that will be refused: ' + el.to]);
@@ -485,9 +485,10 @@
       if (ITEM_ACTIONS.indexOf(action) === -1) {
         out.push(['bad', where + ' has an action that does not exist']);
       } else if (action === 'goto') {
-        if (!it.to) out.push(['bad', where + ' goes to a block but none is chosen']);
+        /* a tunnel is a fine destination — the visitor is played through it and
+           lands in the chamber on the far side */
+        if (!it.to) out.push(['bad', where + ' goes somewhere but nothing is chosen']);
         else if (index && !index.byId.get(it.to)) out.push(['bad', where + ' goes to ' + it.to + ', which no longer exists']);
-        else if (index && isTunnel(index.byId.get(it.to))) out.push(['warn', where + ' goes to ' + it.to + ', a tunnel — the visitor gets routed straight through it']);
       }
 
       /* a room limit only means anything if the block exists, the item does

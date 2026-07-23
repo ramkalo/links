@@ -2421,7 +2421,8 @@
         fillBlockSelect(row.querySelector('[data-f="to"]'), it.to || '');
       }
       if (action !== 'none') {
-        fillBlockSelect(row.querySelector('[data-f="room"]'), it.room || '', '— usable anywhere —');
+        /* chambers only — an item gated to a tunnel could never fire */
+        fillBlockSelect(row.querySelector('[data-f="room"]'), it.room || '', '— usable anywhere —', true);
       }
     });
   }
@@ -3034,11 +3035,21 @@
     document.getElementById('f-el-toitem').hidden = action !== 'additem';
   }
 
-  function fillBlockSelect(select, current, placeholder) {
+  /* `chambersOnly` is for the item's room limit — a visitor never stops inside a
+     tunnel, so gating an item to one would mean it could never fire. Anything
+     that *sends* the visitor somewhere (a go-to button, a go-to item) can target
+     a tunnel quite happily: the engine plays it and carries on to the chamber
+     beyond, which is a good way to make a destination feel earned. */
+  function fillBlockSelect(select, current, placeholder, chambersOnly) {
+    var cells = state.maze.cells.filter(function (c) {
+      return !chambersOnly || !L.isTunnel(c);
+    });
+
     select.innerHTML = '<option value="">' + esc(placeholder || '— pick a block —') + '</option>' +
-      state.maze.cells.filter(function (c) { return !L.isTunnel(c); }).map(function (c) {
+      cells.map(function (c) {
+        var what = L.isTunnel(c) ? 'tunnel' : (c.title || linkTitle(c.link) || 'text only');
         return '<option value="' + esc(c.id) + '"' + (c.id === current ? ' selected' : '') + '>' +
-          esc(c.id + ' · ' + (c.title || linkTitle(c.link) || 'text only')) + '</option>';
+          esc(c.id + ' · ' + what) + '</option>';
       }).join('');
   }
 

@@ -44,8 +44,10 @@ of an anchor, so there's nothing to click.
 The backpack's contents live in the map as an optional `items` array — text, not icons. An item is
 `{ id, name, flavor, action, to, room, start }`: `flavor` is the line shown when it's tapped,
 `action` is one of `ITEM_ACTIONS` (`none` / `goto` / `start` / `random`), `to` is the block a `goto`
-item leads to, `room` optionally restricts the action to fire only while the visitor is standing in
-that block (`itemUsableIn()` is the check, exported so the tests agree), and `start: true` puts it in
+item leads to — **a tunnel is a valid target**, since `travelTo()` plays it and carries on to the
+chamber beyond; the same is true of a `goto` button — `room` optionally restricts the action to fire
+only while the visitor is standing in that block (`itemUsableIn()` is the check, exported so the
+tests agree; the editor offers chambers only there, because nobody stops in a tunnel), and `start: true` puts it in
 the pack from the first screen. A room-gated item still shows its flavor everywhere; only the action
 is withheld, so a key reads the same in every room but turns only at its door. The escape rope is just the default
 item with `action: 'start'`; **`DEFAULT_ITEMS` is the original hardcoded pack, now editable**, and a
