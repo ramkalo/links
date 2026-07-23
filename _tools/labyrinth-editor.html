@@ -343,6 +343,11 @@
   .row { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
   .row button { flex: 1; }
 
+  #clip-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.6rem; }
+  #clip-row button { flex: none; }
+  #clip-row button:disabled { opacity: .4; cursor: not-allowed; border-color: var(--border); }
+  #clip-status { color: var(--teal); font-size: 10px; }
+
   .issue { font-size: 11px; margin-bottom: 0.35rem; color: var(--muted); }
   .issue.bad { color: var(--red); }
   .issue.warn { color: var(--amber); }
@@ -534,6 +539,18 @@
     outline: 1px solid rgba(255,255,255,.12);
   }
 
+  /* the real navigation arrows, shown in the stage as guides. They fill the page
+     the same way they do on the site, but never take a click so a drag near the
+     edge still reaches the element under them. */
+  .lab-arrow-guides {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+  }
+
+  .lab-arrow-guides .lab-arrow { opacity: .5; }
+
   .lay-el {
     outline: 1px dashed rgba(255,255,255,.22);
     outline-offset: -1px;
@@ -711,6 +728,9 @@
         <div id="layout-scaler">
           <div class="lab-page lab-laid-out" id="layout-page">
             <div class="lab-canvas" id="layout-canvas"></div>
+            <!-- the real navigation arrows for this block, shown as guides to
+                 arrange around; non-interactive here -->
+            <div class="lab-arrow-guides" id="layout-arrows"></div>
           </div>
         </div>
       </div>
@@ -728,7 +748,12 @@
     </div>
 
     <section class="pane" data-pane="block">
-      <p class="hint" id="no-selection">click a block to select it, or its ✎ button to edit it here. cmd/ctrl-click to select several. drag to move, delete key to remove.</p>
+      <div id="clip-row">
+        <button id="copy-block" title="copy the selected block(s) — ⌘/ctrl-C">copy</button>
+        <button id="paste-block" title="paste — ⌘/ctrl-V">paste</button>
+        <span class="hint" id="clip-status"></span>
+      </div>
+      <p class="hint" id="no-selection">click a block to select it, or its ✎ button to edit it here. cmd/ctrl-click to select several. drag to move, delete to remove. copy/paste with the buttons above or ⌘/ctrl-C / -V; ⌘/ctrl-D duplicates in place.</p>
 
       <div id="bulk" hidden>
         <p><span id="bulk-count">0</span> blocks selected</p>
@@ -1062,6 +1087,24 @@
       var raw = localStorage.getItem(STORE);
       if (raw) return JSON.parse(raw);
     } catch (err) { /* corrupt draft */ }
+    return null;
+  }
+
+  /* Copied blocks live here, and in localStorage so a copy survives a reload and
+     can be pasted into a different map opened in the same browser. */
+  var CLIP = 'labyrinth-editor-clip';
+  var clipboard = null;
+  var clipTimer = null;
+
+  function saveClip() {
+    try { localStorage.setItem(CLIP, JSON.stringify(clipboard)); } catch (err) { /* full or blocked */ }
+  }
+
+  function loadClip() {
+    try {
+      var raw = localStorage.getItem(CLIP);
+      if (raw) return JSON.parse(raw);
+    } catch (err) { /* corrupt */ }
     return null;
   }
 
@@ -1560,6 +1603,8 @@
     if (many) {
       document.getElementById('bulk-count').textContent = state.selection.length;
     }
+
+    updateClipUI();
     if (!cell) return;
 
     var tunnel = L.isTunnel(cell);
@@ -1701,15 +1746,134 @@
   document.getElementById('delete-cell').addEventListener('click', deleteSelected);
   document.getElementById('delete-selected').addEventListener('click', deleteSelected);
 
+  /* ----------------------------------------------------------- copy / paste */
+
+  /* Where to drop a pasted group so it lands on empty squares. Tries a few
+     offsets near the original first, then falls back to clear of the whole map.
+     Pure — takes the cells and the existing map, returns {dx,dy} — so it can be
+     tested in node. */
+  function findPasteOffset(templates, existing) {
+    var occ = {};
+    existing.forEach(function (c) { occ[c.x + ',' + c.y] = true; });
+
+    function fits(dx, dy) {
+      return templates.every(function (c) { return !occ[(c.x + dx) + ',' + (c.y + dy)]; });
+    }
+
+    for (var d = 1; d <= 30; d++) {
+      if (fits(d, d)) return { dx: d, dy: d };
+      if (fits(d, 0)) return { dx: d, dy: 0 };
+      if (fits(0, d)) return { dx: 0, dy: d };
+    }
+
+    var maxX = existing.length ? Math.max.apply(null, existing.map(function (c) { return c.x; })) : 0;
+    var minX = Math.min.apply(null, templates.map(function (c) { return c.x; }));
+    return { dx: maxX + 2 - minX, dy: 0 };
+  }
+
+  /* Clones a batch of cells with fresh ids, shifted by `off`. A wormhole exit or
+     a go-to button that points at another block *in the same batch* is repointed
+     at that block's copy; anything pointing outside the batch is left as it was.
+     Pure and id-only, so it's straightforward to test. */
+  function duplicateCells(templates, existing, off) {
+    var used = {};
+    existing.forEach(function (c) { used[c.id] = true; });
+
+    var inGroup = {};
+    templates.forEach(function (c) { inGroup[c.id] = true; });
+
+    function fresh() { var n = 0; while (used['c' + n]) n++; used['c' + n] = true; return 'c' + n; }
+
+    var idMap = {};
+    templates.forEach(function (c) { idMap[c.id] = fresh(); });
+
+    return templates.map(function (c) {
+      var copy = JSON.parse(JSON.stringify(c));
+      copy.id = idMap[c.id];
+      copy.x = c.x + off.dx;
+      copy.y = c.y + off.dy;
+
+      if (copy.exits) {
+        DIRS.forEach(function (dir) {
+          var t = copy.exits[dir];
+          if (t && inGroup[t]) copy.exits[dir] = idMap[t];
+        });
+      }
+      (copy.layout || []).forEach(function (el) {
+        if (el.type === 'button' && el.action === 'goto' && el.to && inGroup[el.to]) {
+          el.to = idMap[el.to];
+        }
+      });
+      return copy;
+    });
+  }
+
+  function flashClip(msg) {
+    var el = document.getElementById('clip-status');
+    el.textContent = msg;
+    clearTimeout(clipTimer);
+    clipTimer = setTimeout(function () { el.textContent = ''; }, 1600);
+  }
+
+  function updateClipUI() {
+    document.getElementById('copy-block').disabled = !state.selection.length;
+    document.getElementById('paste-block').disabled = !(clipboard && clipboard.length);
+  }
+
+  function copySelection() {
+    var cells = selectedCells();
+    if (!cells.length) return;
+
+    clipboard = cells.map(function (c) { return JSON.parse(JSON.stringify(c)); });
+    saveClip();
+    updateClipUI();
+    flashClip('copied ' + cells.length + (cells.length === 1 ? ' block' : ' blocks'));
+  }
+
+  /* Shared by paste (from the clipboard) and duplicate (from the selection). */
+  function dropCopies(templates, note) {
+    var off = findPasteOffset(templates, state.maze.cells);
+    var made = duplicateCells(templates, state.maze.cells, off);
+
+    state.maze.cells.push.apply(state.maze.cells, made);
+    state.selection = made.map(function (c) { return c.id; });
+
+    showTab('block');
+    showInspector();
+    draw();
+    flashClip(note + ' ' + made.length + (made.length === 1 ? ' block' : ' blocks'));
+  }
+
+  function pasteClipboard() {
+    if (clipboard && clipboard.length) dropCopies(clipboard, 'pasted');
+  }
+
+  function duplicateSelection() {
+    var cells = selectedCells();
+    if (cells.length) dropCopies(cells, 'duplicated');
+  }
+
+  document.getElementById('copy-block').addEventListener('click', copySelection);
+  document.getElementById('paste-block').addEventListener('click', pasteClipboard);
+
   document.addEventListener('keydown', function (e) {
     /* while a test is running the keyboard belongs to the labyrinth, and while
        layout mode is open it belongs to that — otherwise escape and delete would
        edit the map behind whatever is covering it */
     if (io.open || testing || !layOverlay.hidden) return;
 
-    /* backspacing inside the title field must not delete the page */
+    /* backspacing inside the title field must not delete the page — and ⌘C/⌘V in
+       a field stays the browser's own copy/paste */
     var focused = document.activeElement;
     if (focused && /^(INPUT|SELECT|TEXTAREA)$/.test(focused.tagName)) return;
+
+    if (e.metaKey || e.ctrlKey) {
+      var k = e.key.toLowerCase();
+      if (k === 'c' && state.selection.length) { e.preventDefault(); copySelection(); return; }
+      if (k === 'v' && clipboard && clipboard.length) { e.preventDefault(); pasteClipboard(); return; }
+      if (k === 'd' && state.selection.length) { e.preventDefault(); duplicateSelection(); return; }
+      return;
+    }
 
     if (e.key === 'Escape' && state.selection.length) {
       state.selection = [];
@@ -2492,6 +2656,16 @@
     });
 
     var list = layList();
+
+    /* the arrows the visitor will actually see on this block — same directions
+       resolveExit() gives the site, so what you arrange around is what ships */
+    var index = L.indexMaze(state.maze);
+    var cell = layCell();
+    document.getElementById('layout-arrows').innerHTML = cell
+      ? DIRS.filter(function (dir) { return !!index.resolveExit(cell, dir); }).map(function (dir) {
+          return '<button class="lab-arrow lab-arrow-' + dir + '" tabindex="-1"></button>';
+        }).join('')
+      : '';
 
     layCanvas.innerHTML =
       '<div id="layout-grid"></div>' +
@@ -3405,6 +3579,7 @@
     draw();
   }
 
+  clipboard = loadClip();
   useMaze(load() || L.loadMaze());
 })();
 </script>

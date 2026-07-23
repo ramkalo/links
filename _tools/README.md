@@ -32,6 +32,12 @@ it needs — the links, the map, the movement rules — comes from `../map.js` a
   the whole group, and delete removes them all. A group move is refused outright if any
   block would land on top of another, so it can't half-apply
 - **delete** / **backspace** removes the selection, **escape** clears it
+- **copy** and **paste** the selected block(s) with the buttons at the top of the block tab,
+  or **⌘/ctrl-C** and **⌘/ctrl-V**; **⌘/ctrl-D** duplicates in place. A pasted block lands on
+  the nearest free square and comes in selected, ready to drag. Copy a few connected blocks
+  and the wormholes and go-to buttons *between* them re-point to the copies; links to blocks
+  outside the copied set stay as they were. The clipboard sticks around in the browser, so
+  you can paste into a different map too
 - the **links** tab is the catalogue: every link the maze can hold. Blocks point at these
   by url, so editing one here fixes every block using it. Changing a url drags the blocks
   along with it rather than leaving them pointing at nothing
@@ -135,6 +141,12 @@ line, paragraph, image, button. In practice the grid runs out well before the co
 which is the real limit. Drag an element to move it, drag its bottom-right corner to
 resize, or type the numbers in. Arrow keys nudge the selected one a cell at a time; delete
 removes it.
+
+The block's **navigation arrows** show in the stage too — the same ones the visitor will
+see, at the edges this block actually leads somewhere from — so you can arrange elements
+around them instead of underneath. They're just guides here; you can't drag them, and a
+drag near an edge passes straight through to whatever's under it. (Which arrows appear
+depends on the block's exits, set back in the block tab.)
 
 **phone / desktop** at the top redraws the same block at the two extremes of what a real
 screen can be. Check both — that's the whole reason the toggle is there.

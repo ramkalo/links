@@ -165,8 +165,14 @@ whole file — **never hand-edit any of it.**
   mode**, an overlay sharing `<main>`'s first grid cell with `#canvas` so it covers the map without
   scrolling with it; the side panel becomes the element palette and settings. Its stage renders the
   block at true pixel size inside a scaled-down wrapper, so `clamp()`ed fonts and the capped canvas
-  width land where they really will. "copy map code" gives you a whole `map.js` to save over the old
-  one. Its `#labyrinth` div is marked `data-preview` so the engine doesn't open the live map over the
+  width land where they really will. The stage also shows the block's real navigation arrows (the
+  directions `resolveExit()` gives it) in a non-interactive `.lab-arrow-guides` layer, so elements
+  can be arranged around them. "copy map code" gives you a whole `map.js` to save over the old
+  one. Blocks copy/paste (buttons on the block tab, or ⌘/ctrl-C/V, ⌘/ctrl-D to duplicate): the pure
+  `duplicateCells()` clones the selection with fresh ids and remaps intra-group wormhole exits and
+  goto buttons to the copies, `findPasteOffset()` drops them clear of existing squares, and the
+  clipboard persists in `localStorage` so it survives a reload and crosses maps. Its `#labyrinth` div
+  is marked `data-preview` so the engine doesn't open the live map over the
   editor on load — only the test button starts it, via `preview()` — and `data-asset-base="../"` so
   image paths resolve from `_tools/`. It loads `../styles.css` **before** its own `<style>` so the
   real `.lab-*` rules are available while the editor's rules still win any tie.
